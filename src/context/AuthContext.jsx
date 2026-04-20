@@ -12,6 +12,35 @@ import { authAPI } from "../services/api";
 // ─── Create Context ────────────────────────────────────────────────────────────
 const AuthContext = createContext(null);
 
+// ─── Retry Helper ─────────────────────────────────────────────────────────────
+// Render free tier cold start fix — retries getMe() with exponential backoff
+// Attempt 1: immediate, Attempt 2: after 2s, Attempt 3: after 4s, Attempt 4: after 8s
+const fetchDbUserWithRetry = async (retries = 4, delay = 2000) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await authAPI.getMe();
+      return res.data.user; // success — return the user object
+    } catch (err) {
+      const isLastAttempt = i === retries - 1;
+
+      if (isLastAttempt) {
+        console.error("getMe failed after all retries:", err.message);
+        return null;
+      }
+
+      console.warn(
+        `getMe attempt ${i + 1}/${retries} failed. Retrying in ${delay / 1000}s...`,
+        err.message
+      );
+
+      // Wait before next retry (exponential backoff: 2s → 4s → 8s)
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      delay *= 2;
+    }
+  }
+  return null;
+};
+
 // ─── Provider ─────────────────────────────────────────────────────────────────
 export const AuthProvider = ({ children }) => {
   const [user, setUser]       = useState(null);  // Firebase user object
@@ -24,14 +53,15 @@ export const AuthProvider = ({ children }) => {
       if (firebaseUser) {
         setUser(firebaseUser);
 
-        // ✅ Role PostgreSQL se lo (Firebase claims se nahi)
-        try {
-          const res = await authAPI.getMe();
-          setDbUser(res.data.user); // { role, full_name, email, ... }
-        } catch (err) {
-          // User Firebase mein hai but DB mein nahi — register flow handle karega
-          console.warn("User not in DB yet:", err.message);
-          setDbUser(null);
+        // ✅ Role PostgreSQL se lo — with retry for Render cold start
+        const dbUserData = await fetchDbUserWithRetry();
+        setDbUser(dbUserData);
+
+        if (!dbUserData) {
+          // Still null after all retries — could be:
+          // 1. Render backend still starting (very slow cold start)
+          // 2. User in Firebase but not yet in DB (new register flow)
+          console.warn("dbUser is null after all retries. Backend may be cold-starting.");
         }
       } else {
         setUser(null);
@@ -50,8 +80,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ─── Register ─────────────────────────────────────────────────────────────
-  // Step 1: Firebase mein account banao
-  // Step 2: PostgreSQL mein save karo via /api/auth/register
   const register = async (email, password, fullName, extraData = {}) => {
     // Step 1 — Firebase signup
     const result = await createUserWithEmailAndPassword(auth, email, password);
