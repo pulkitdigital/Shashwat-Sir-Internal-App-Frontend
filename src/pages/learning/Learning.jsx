@@ -5,7 +5,6 @@ const LearningCard = ({ item, onToggle }) => (
   <div className="bg-white rounded-2xl border border-gray-200 p-5 hover:border-purple-200 hover:shadow-sm transition">
     <div className="flex items-start justify-between gap-3">
       <div className="flex-1 min-w-0">
-        {/* ✅ item.title from services join, not item.service_name */}
         <h3 className="font-semibold text-gray-900">{item.title}</h3>
         <span className="inline-block mt-1 px-2.5 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs">
           {item.category || "General"}
@@ -13,13 +12,13 @@ const LearningCard = ({ item, onToggle }) => (
         <p className="text-sm text-gray-500 mt-2 line-clamp-2">{item.description}</p>
       </div>
       <button
-        onClick={() => onToggle(item.id)}
+        onClick={() => onToggle(item.service_id)}
         className="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition bg-purple-100 text-purple-700 border border-purple-200 hover:bg-purple-200"
       >
         ✓ Marked
       </button>
     </div>
-    <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+    <div className="mt-3 pt-3 border-t border-gray-100">
       <p className="text-xs text-purple-600 font-medium">
         📚 Status: {item.status || "interested"}
       </p>
@@ -48,10 +47,10 @@ const ServiceCard = ({ service, onMark }) => (
 );
 
 export default function Learning() {
-  const [myLearning, setMyLearning]   = useState([]); // services I want to learn
-  const [allServices, setAllServices] = useState([]); // all available services
+  const [myLearning, setMyLearning]   = useState([]);
+  const [allServices, setAllServices] = useState([]);
   const [loading, setLoading]         = useState(true);
-  const [activeTab, setActiveTab]     = useState("all"); // "all" | "my"
+  const [activeTab, setActiveTab]     = useState("all");
   const [search, setSearch]           = useState("");
 
   useEffect(() => {
@@ -62,8 +61,8 @@ export default function Learning() {
     setLoading(true);
     try {
       const [learnRes, svcRes] = await Promise.all([
-        learningAPI.getMine(),   // ✅ GET /learning — my interests
-        serviceAPI.getAll(),     // ✅ GET /services — all services
+        learningAPI.getMine(),
+        serviceAPI.getAll(),
       ]);
       setMyLearning(learnRes.data.learning || []);
       setAllServices(svcRes.data.services || []);
@@ -74,29 +73,49 @@ export default function Learning() {
     }
   };
 
-  // ✅ Mark a service as "want to learn"
+  // ✅ OPTIMISTIC: pehle UI update, phir API call
   const handleMark = async (serviceId) => {
+    // Service ka full object allServices se dhundho
+    const service = allServices.find((s) => s.id === serviceId);
+    if (!service) return;
+
+    // Turant "My List" mein add karo
+    const optimisticEntry = {
+      service_id:  service.id,
+      title:       service.title,
+      category:    service.category,
+      description: service.description,
+      status:      "interested",
+    };
+    setMyLearning((prev) => [...prev, optimisticEntry]);
+
     try {
       await learningAPI.add({ service_id: serviceId });
-      const res = await learningAPI.getMine();
-      setMyLearning(res.data.learning || []);
     } catch (err) {
       console.error("Mark failed:", err.message);
+      // Rollback karo agar API fail ho
+      setMyLearning((prev) => prev.filter((l) => l.service_id !== serviceId));
     }
   };
 
-  // ✅ Remove from learning list
+  // ✅ OPTIMISTIC: pehle UI se hatao, phir API call
   const handleToggle = async (serviceId) => {
+    // Turant list se hatao
+    const removed = myLearning.find((l) => l.service_id === serviceId);
+    setMyLearning((prev) => prev.filter((l) => l.service_id !== serviceId));
+
     try {
       await learningAPI.remove(serviceId);
-      setMyLearning(myLearning.filter((l) => l.service_id !== serviceId));
     } catch (err) {
       console.error("Remove failed:", err.message);
+      // Rollback karo agar API fail ho
+      if (removed) {
+        setMyLearning((prev) => [...prev, removed]);
+      }
     }
   };
 
-  // Services I haven't marked yet
-  const myLearningIds = new Set(myLearning.map((l) => l.service_id));
+  const myLearningIds    = new Set(myLearning.map((l) => l.service_id));
   const unmarkedServices = allServices.filter((s) => !myLearningIds.has(s.id));
 
   const filteredMy = myLearning.filter(
@@ -167,18 +186,16 @@ export default function Learning() {
             ))}
           </div>
         )
+      ) : filteredAll.length === 0 ? (
+        <div className="text-center py-24 text-gray-400 text-sm">
+          No services found.
+        </div>
       ) : (
-        filteredAll.length === 0 ? (
-          <div className="text-center py-24 text-gray-400 text-sm">
-            No services found.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredAll.map((service) => (
-              <ServiceCard key={service.id} service={service} onMark={handleMark} />
-            ))}
-          </div>
-        )
+        <div className="space-y-3">
+          {filteredAll.map((service) => (
+            <ServiceCard key={service.id} service={service} onMark={handleMark} />
+          ))}
+        </div>
       )}
     </div>
   );

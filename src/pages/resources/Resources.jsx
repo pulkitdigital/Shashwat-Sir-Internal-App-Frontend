@@ -21,9 +21,10 @@ const normalizeUrl = (url) => {
 };
 
 // ─── Resource Card ─────────────────────────────────────────────────────────────
-const ResourceCard = ({ resource, onDelete, isAdmin }) => {
+const ResourceCard = ({ resource, onDelete, isAdmin, currentUid }) => {
   const normalizedUrl = normalizeUrl(resource.url);
   const thumbnail = isYouTube(normalizedUrl) ? getYouTubeThumbnail(normalizedUrl) : null;
+  const isOwner = resource.added_by === currentUid;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden hover:border-blue-200 hover:shadow-sm transition">
@@ -49,9 +50,19 @@ const ResourceCard = ({ resource, onDelete, isAdmin }) => {
             </button>
           )}
         </div>
+
         {resource.description && (
           <p className="text-xs text-gray-500 mb-3 line-clamp-2">{resource.description}</p>
         )}
+
+        {/* ✅ Added by */}
+        <p className="text-xs text-gray-400 mb-3">
+          Added by{" "}
+          <span className="font-medium text-gray-600">
+            {isOwner ? "You" : resource.added_by_name || "Unknown"}
+          </span>
+        </p>
+
         <div className="flex items-center justify-between">
           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
             isYouTube(normalizedUrl) ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600"
@@ -74,7 +85,7 @@ const ResourceCard = ({ resource, onDelete, isAdmin }) => {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function Resources() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [resources, setResources] = useState([]);
   const [services,  setServices]  = useState([]);
   const [loading,   setLoading]   = useState(true);
@@ -138,7 +149,6 @@ export default function Resources() {
         </button>
       </div>
 
-      {/* ✅ Shared ResourceForm — serviceId null, services list pass karo */}
       {showForm && (
         <div className="mb-6">
           <ResourceForm
@@ -179,6 +189,7 @@ export default function Resources() {
               resource={r}
               onDelete={handleDelete}
               isAdmin={isAdmin}
+              currentUid={user?.uid}
             />
           ))}
         </div>

@@ -93,7 +93,8 @@ export const employeeAPI = {
   getByUid      : (uid)        => api.get(`/employees/${uid}`),
 
   // Skills — what the employee KNOWS
-  addSkill      : (data)       => api.post("/employees/services", data),         // { service_id, proficiency }
+  addSkill      : (data)       => api.post("/employees/services", data),          // { service_id, proficiency }
+  addCustomSkill: (data)       => api.post("/employees/services/custom", data),   // { title, proficiency } ← NEW
   removeSkill   : (serviceId)  => api.delete(`/employees/services/${serviceId}`),
 };
 
