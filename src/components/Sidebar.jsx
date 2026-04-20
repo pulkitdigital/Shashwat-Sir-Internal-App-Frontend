@@ -8,6 +8,7 @@ import {
   Library,
   ShieldCheck,
   LogOut,
+  Zap,
 } from "lucide-react";
 
 // ─── Nav Item Config ───────────────────────────────────────────
@@ -17,6 +18,7 @@ const navItems = [
   { to: "/employees",  label: "Employees",  icon: Users },
   { to: "/learning",   label: "Learning",   icon: BookOpen },
   { to: "/resources",  label: "Resources",  icon: Library },
+  { to: "/skills", label: "Skills", icon: Zap },
 ];
 
 const adminItems = [

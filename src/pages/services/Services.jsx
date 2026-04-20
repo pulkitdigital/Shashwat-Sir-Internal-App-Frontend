@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { serviceAPI } from "../../services/api";
+import { serviceAPI, resourceAPI } from "../../services/api"; // ✅ resourceAPI import add karo
+import ResourceForm from "../../components/ResourceForm"; // ✅ import
 
 // ─── Tab Button ────────────────────────────────────────────────────────────────
 const Tab = ({ active, onClick, children, count }) => (
@@ -51,7 +52,6 @@ const ServiceCard = ({ service, onDelete, isAdmin, currentUid }) => {
           <span className="text-xs text-gray-400">
             {service.employee_count || 0} employees know this
           </span>
-          {/* ✅ Creator name */}
           <span className="text-xs text-gray-400">
             Added by{" "}
             <span className="font-medium text-gray-600">
@@ -73,14 +73,18 @@ const ServiceCard = ({ service, onDelete, isAdmin, currentUid }) => {
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function Services() {
   const { isAdmin, user } = useAuth();
-  const [services, setServices]       = useState([]);
-  const [search, setSearch]           = useState("");
-  const [loading, setLoading]         = useState(true);
-  const [activeTab, setActiveTab]     = useState("all"); // "all" | "mine"
-  const [showForm, setShowForm]       = useState(false);
-  const [form, setForm]               = useState({ title: "", category: "", description: "" });
-  const [formLoading, setFormLoading] = useState(false);
-  const [error, setError]             = useState("");
+  const [services, setServices]             = useState([]);
+  const [search, setSearch]                 = useState("");
+  const [loading, setLoading]               = useState(true);
+  const [activeTab, setActiveTab]           = useState("all");
+  const [showForm, setShowForm]             = useState(false);
+  const [form, setForm]                     = useState({ title: "", category: "", description: "" });
+  const [formLoading, setFormLoading]       = useState(false);
+  const [error, setError]                   = useState("");
+
+  // ✅ New: resource state
+  const [pendingResources, setPendingResources] = useState([]); // staged resources
+  const [showResourceForm, setShowResourceForm] = useState(false);
 
   useEffect(() => { fetchServices(); }, []);
 
@@ -97,15 +101,39 @@ export default function Services() {
     }
   };
 
+  // ✅ ResourceForm ka onAdd — sirf local state mein stage karo (service abhi bani nahi)
+  const handleStagedResource = (resource) => {
+    // resourceAPI.create nahi hoga abhi — hum sirf form data store karenge
+    // ResourceForm normally API call karta hai, isliye ek alag inline mini-form banate hain
+    setPendingResources((prev) => [...prev, resource]);
+    setShowResourceForm(false);
+  };
+
+  const removePendingResource = (index) => {
+    setPendingResources((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // ✅ Save: pehle service banao, phir resources
   const handleAdd = async () => {
     if (!form.title.trim()) return;
     setFormLoading(true);
     setError("");
     try {
+      // Step 1: Service create karo
       const res = await serviceAPI.create(form);
-      setServices([res.data.service, ...services]);
+      const newService = res.data.service;
+
+      // Step 2: Pending resources ko us service ke saath save karo
+      for (const r of pendingResources) {
+        await resourceAPI.create({ ...r, service_id: newService.id });
+      }
+
+      // Step 3: Reset & update list
+      setServices([newService, ...services]);
       setForm({ title: "", category: "", description: "" });
+      setPendingResources([]);
       setShowForm(false);
+      setShowResourceForm(false);
     } catch (err) {
       setError("Failed to add service. Please try again.");
     } finally {
@@ -123,13 +151,18 @@ export default function Services() {
     }
   };
 
-  // ─── Tab filtering ────────────────────────────────────────────────────────
+  const handleCancelForm = () => {
+    setShowForm(false);
+    setShowResourceForm(false);
+    setPendingResources([]);
+    setForm({ title: "", category: "", description: "" });
+    setError("");
+  };
+
   const myServices  = services.filter((s) => s.created_by === user?.uid);
   const allServices = services;
-
-  const baseList = activeTab === "mine" ? myServices : allServices;
-
-  const filtered = baseList.filter(
+  const baseList    = activeTab === "mine" ? myServices : allServices;
+  const filtered    = baseList.filter(
     (s) =>
       s.title?.toLowerCase().includes(search.toLowerCase()) ||
       s.category?.toLowerCase().includes(search.toLowerCase())
@@ -144,39 +177,34 @@ export default function Services() {
           <p className="text-sm text-gray-500 mt-0.5">{services.length} services available</p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => showForm ? handleCancelForm() : setShowForm(true)}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition"
         >
           {showForm ? "Cancel" : "+ Add Service"}
         </button>
       </div>
 
-      {/* ─── Tabs ─────────────────────────────────────────────────────────── */}
+      {/* Tabs */}
       <div className="flex gap-2 mb-5">
-        <Tab
-          active={activeTab === "all"}
-          onClick={() => setActiveTab("all")}
-          count={allServices.length}
-        >
+        <Tab active={activeTab === "all"} onClick={() => setActiveTab("all")} count={allServices.length}>
           📋 All Services
         </Tab>
-        <Tab
-          active={activeTab === "mine"}
-          onClick={() => setActiveTab("mine")}
-          count={myServices.length}
-        >
+        <Tab active={activeTab === "mine"} onClick={() => setActiveTab("mine")} count={myServices.length}>
           ✏️ My Services
         </Tab>
       </div>
 
-      {/* Add Form */}
+      {/* ─── Add Form ──────────────────────────────────────────────────────────── */}
       {showForm && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">New Service</h2>
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6 space-y-5">
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">New Service</h2>
+
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">{error}</div>
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">{error}</div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+
+          {/* Service Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Service Name *</label>
               <input
@@ -197,24 +225,84 @@ export default function Services() {
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               />
             </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="Brief description..."
+                rows={3}
+                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition resize-none"
+              />
+            </div>
           </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Brief description..."
-              rows={3}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition resize-none"
-            />
+
+          {/* ─── Resources Section ──────────────────────────────────────────── */}
+          <div className="border-t border-gray-100 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                📎 Resources (optional)
+              </h3>
+              <button
+                onClick={() => setShowResourceForm(!showResourceForm)}
+                className="text-xs text-blue-600 font-medium hover:underline"
+              >
+                {showResourceForm ? "Cancel" : "+ Add Resource"}
+              </button>
+            </div>
+
+            {/* Inline ResourceForm — service_id null kyunki abhi service bani nahi */}
+            {showResourceForm && (
+              <div className="mb-3">
+                <InlineResourceInput
+                  onAdd={handleStagedResource}
+                  onCancel={() => setShowResourceForm(false)}
+                />
+              </div>
+            )}
+
+            {/* Staged resources list */}
+            {pendingResources.length > 0 && (
+              <ul className="space-y-1.5">
+                {pendingResources.map((r, i) => (
+                  <li key={i} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg text-sm">
+                    <span className="text-gray-700">
+                      {r.resource_type === "video" ? "🎥" : r.resource_type === "pdf" ? "📄" : r.resource_type === "article" ? "📝" : "🔗"}{" "}
+                      <span className="font-medium">{r.title}</span>
+                      <span className="text-gray-400 ml-1 text-xs">({r.resource_type})</span>
+                    </span>
+                    <button
+                      onClick={() => removePendingResource(i)}
+                      className="text-red-400 hover:text-red-600 text-xs ml-3"
+                    >
+                      ✕ Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-          <button
-            onClick={handleAdd}
-            disabled={formLoading}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition"
-          >
-            {formLoading ? "Adding..." : "Add Service"}
-          </button>
+
+          {/* Save Button */}
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={handleAdd}
+              disabled={formLoading || !form.title.trim()}
+              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition"
+            >
+              {formLoading
+                ? "Saving..."
+                : pendingResources.length > 0
+                ? `Save Service + ${pendingResources.length} Resource${pendingResources.length > 1 ? "s" : ""}`
+                : "Save Service"}
+            </button>
+            <button
+              onClick={handleCancelForm}
+              className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 
@@ -253,6 +341,100 @@ export default function Services() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Inline Resource Input ─────────────────────────────────────────────────────
+// Yeh ResourceForm.jsx use nahi karta kyunki abhi service_id exist nahi karta
+// Sirf local state mein data stage karta hai, API call nahi karta
+function InlineResourceInput({ onAdd, onCancel }) {
+  const normalizeUrl = (url) => {
+    if (!url) return "#";
+    const t = url.trim();
+    if (!t) return "#";
+    if (/^https?:\/\//i.test(t)) return t;
+    if (t.startsWith("//")) return `https:${t}`;
+    return `https://${t}`;
+  };
+
+  const [form, setForm] = useState({
+    title: "", url: "", description: "", resource_type: "video",
+  });
+  const [err, setErr] = useState("");
+
+  const handleAdd = () => {
+    if (!form.title.trim() || !form.url.trim()) {
+      setErr("Title aur URL dono required hain.");
+      return;
+    }
+    onAdd({ ...form, url: normalizeUrl(form.url) });
+    setForm({ title: "", url: "", description: "", resource_type: "video" });
+    setErr("");
+  };
+
+  return (
+    <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-3">
+      {err && <p className="text-xs text-red-500">{err}</p>}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Title *</label>
+          <input
+            type="text"
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            placeholder="e.g. GST Filing Tutorial"
+            className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">URL *</label>
+          <input
+            type="text"
+            value={form.url}
+            onChange={(e) => setForm({ ...form, url: e.target.value })}
+            placeholder="https://..."
+            className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+          <select
+            value={form.resource_type}
+            onChange={(e) => setForm({ ...form, resource_type: e.target.value })}
+            className="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+          >
+            <option value="video">🎥 Video</option>
+            <option value="article">📝 Article</option>
+            <option value="pdf">📄 PDF</option>
+            <option value="other">🔗 Other</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
+          <input
+            type="text"
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            placeholder="Optional"
+            className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+          />
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={handleAdd}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition"
+        >
+          + Stage Resource
+        </button>
+        <button
+          onClick={onCancel}
+          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

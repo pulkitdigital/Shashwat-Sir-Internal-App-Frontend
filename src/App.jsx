@@ -1,4 +1,9 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 
 // Auth Pages
@@ -18,7 +23,7 @@ import ServiceDetail from "./pages/services/ServiceDetail";
 import Employees from "./pages/employees/Employees";
 import Learning from "./pages/learning/Learning";
 import Resources from "./pages/resources/Resources";
-
+import Skills from "./pages/skills/Skills";
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
 
@@ -29,9 +34,7 @@ const AppLayout = ({ children }) => {
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Navbar />
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
-        </main>
+        <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
     </div>
   );
@@ -55,7 +58,6 @@ const App = () => {
   return (
     <Router>
       <Routes>
-
         {/* ─── Public Routes ─── */}
         <Route
           path="/login"
@@ -68,7 +70,6 @@ const App = () => {
 
         {/* ─── Protected Routes (All Employees) ─── */}
         <Route element={<ProtectedRoute />}>
-
           <Route
             path="/dashboard"
             element={
@@ -132,11 +133,18 @@ const App = () => {
             }
           />
 
+          <Route
+            path="/skills"
+            element={
+              <AppLayout>
+                <Skills />
+              </AppLayout>
+            }
+          />
         </Route>
 
         {/* ─── Admin Only Routes ─── */}
         <Route element={<ProtectedRoute adminOnly={true} />}>
-
           <Route
             path="/admin"
             element={
@@ -145,7 +153,6 @@ const App = () => {
               </AppLayout>
             }
           />
-
         </Route>
 
         {/* ─── Default Redirect ─── */}
@@ -172,7 +179,6 @@ const App = () => {
             </div>
           }
         />
-
       </Routes>
     </Router>
   );

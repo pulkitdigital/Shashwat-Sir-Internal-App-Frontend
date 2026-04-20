@@ -1,7 +1,16 @@
 import { useState, useEffect } from "react";
-import { learningAPI, serviceAPI } from "../../services/api";
+import { learningAPI, serviceAPI, resourceAPI } from "../../services/api"; // ✅ resourceAPI add
 
-const LearningCard = ({ item, onToggle }) => (
+// ─── Resource icon helper ──────────────────────────────────────────────────────
+const resourceIcon = (type) => {
+  if (type === "video")   return "🎥";
+  if (type === "pdf")     return "📄";
+  if (type === "article") return "📝";
+  return "🔗";
+};
+
+// ─── Learning Card (My List) ───────────────────────────────────────────────────
+const LearningCard = ({ item, onToggle, resources }) => (
   <div className="bg-white rounded-2xl border border-gray-200 p-5 hover:border-purple-200 hover:shadow-sm transition">
     <div className="flex items-start justify-between gap-3">
       <div className="flex-1 min-w-0">
@@ -10,7 +19,25 @@ const LearningCard = ({ item, onToggle }) => (
           {item.category || "General"}
         </span>
         <p className="text-sm text-gray-500 mt-2 line-clamp-2">{item.description}</p>
+
+        {/* ✅ Resources */}
+        {resources?.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {resources.map((r) => (
+              <a
+                key={r.id}
+                href={r.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-100 rounded-full text-xs font-medium hover:bg-purple-100 transition"
+              >
+                {resourceIcon(r.resource_type)} {r.title}
+              </a>
+            ))}
+          </div>
+        )}
       </div>
+
       <button
         onClick={() => onToggle(item.service_id)}
         className="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition bg-purple-100 text-purple-700 border border-purple-200 hover:bg-purple-200"
@@ -18,6 +45,7 @@ const LearningCard = ({ item, onToggle }) => (
         ✓ Marked
       </button>
     </div>
+
     <div className="mt-3 pt-3 border-t border-gray-100">
       <p className="text-xs text-purple-600 font-medium">
         📚 Status: {item.status || "interested"}
@@ -26,7 +54,8 @@ const LearningCard = ({ item, onToggle }) => (
   </div>
 );
 
-const ServiceCard = ({ service, onMark }) => (
+// ─── Service Card (All Services) ───────────────────────────────────────────────
+const ServiceCard = ({ service, onMark, resources }) => (
   <div className="bg-white rounded-2xl border border-gray-200 p-5 hover:border-purple-200 hover:shadow-sm transition">
     <div className="flex items-start justify-between gap-3">
       <div className="flex-1 min-w-0">
@@ -35,7 +64,25 @@ const ServiceCard = ({ service, onMark }) => (
           {service.category || "General"}
         </span>
         <p className="text-sm text-gray-500 mt-2 line-clamp-2">{service.description}</p>
+
+        {/* ✅ Resources */}
+        {resources?.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {resources.map((r) => (
+              <a
+                key={r.id}
+                href={r.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-50 text-gray-600 border border-gray-200 rounded-full text-xs font-medium hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200 transition"
+              >
+                {resourceIcon(r.resource_type)} {r.title}
+              </a>
+            ))}
+          </div>
+        )}
       </div>
+
       <button
         onClick={() => onMark(service.id)}
         className="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition bg-gray-100 text-gray-600 hover:bg-purple-50 hover:text-purple-600"
@@ -46,26 +93,39 @@ const ServiceCard = ({ service, onMark }) => (
   </div>
 );
 
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function Learning() {
-  const [myLearning, setMyLearning]   = useState([]);
-  const [allServices, setAllServices] = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [activeTab, setActiveTab]     = useState("all");
-  const [search, setSearch]           = useState("");
+  const [myLearning, setMyLearning]     = useState([]);
+  const [allServices, setAllServices]   = useState([]);
+  const [resourcesMap, setResourcesMap] = useState({}); // ✅ { service_id: [resources] }
+  const [loading, setLoading]           = useState(true);
+  const [activeTab, setActiveTab]       = useState("my"); // ✅ "my" pehle
+  const [search, setSearch]             = useState("");
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [learnRes, svcRes] = await Promise.all([
+      const [learnRes, svcRes, resourceRes] = await Promise.all([
         learningAPI.getMine(),
         serviceAPI.getAll(),
+        resourceAPI.getAll(), // ✅ sab resources ek saath
       ]);
+
       setMyLearning(learnRes.data.learning || []);
       setAllServices(svcRes.data.services || []);
+
+      // ✅ Resources ko service_id ke hisaab se group karo
+      const allResources = resourceRes.data.resources || [];
+      const grouped = allResources.reduce((acc, r) => {
+        if (!r.service_id) return acc;
+        if (!acc[r.service_id]) acc[r.service_id] = [];
+        acc[r.service_id].push(r);
+        return acc;
+      }, {});
+      setResourcesMap(grouped);
+
     } catch (err) {
       console.error("Failed to fetch learning data:", err.message);
     } finally {
@@ -73,13 +133,10 @@ export default function Learning() {
     }
   };
 
-  // ✅ OPTIMISTIC: pehle UI update, phir API call
   const handleMark = async (serviceId) => {
-    // Service ka full object allServices se dhundho
     const service = allServices.find((s) => s.id === serviceId);
     if (!service) return;
 
-    // Turant "My List" mein add karo
     const optimisticEntry = {
       service_id:  service.id,
       title:       service.title,
@@ -93,14 +150,11 @@ export default function Learning() {
       await learningAPI.add({ service_id: serviceId });
     } catch (err) {
       console.error("Mark failed:", err.message);
-      // Rollback karo agar API fail ho
       setMyLearning((prev) => prev.filter((l) => l.service_id !== serviceId));
     }
   };
 
-  // ✅ OPTIMISTIC: pehle UI se hatao, phir API call
   const handleToggle = async (serviceId) => {
-    // Turant list se hatao
     const removed = myLearning.find((l) => l.service_id === serviceId);
     setMyLearning((prev) => prev.filter((l) => l.service_id !== serviceId));
 
@@ -108,10 +162,7 @@ export default function Learning() {
       await learningAPI.remove(serviceId);
     } catch (err) {
       console.error("Remove failed:", err.message);
-      // Rollback karo agar API fail ho
-      if (removed) {
-        setMyLearning((prev) => [...prev, removed]);
-      }
+      if (removed) setMyLearning((prev) => [...prev, removed]);
     }
   };
 
@@ -140,11 +191,11 @@ export default function Learning() {
         </p>
       </div>
 
-      {/* Tabs */}
+      {/* ✅ Tabs — My List pehle */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit mb-5">
         {[
-          { key: "all", label: `All Services (${unmarkedServices.length})` },
           { key: "my",  label: `My List (${myLearning.length})` },
+          { key: "all", label: `All Services (${unmarkedServices.length})` },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -177,23 +228,37 @@ export default function Learning() {
       ) : activeTab === "my" ? (
         filteredMy.length === 0 ? (
           <div className="text-center py-24 text-gray-400 text-sm">
-            You haven't marked any services yet. Browse 'All Services' to get started.
+            You haven't marked any services yet.{" "}
+            <button
+              onClick={() => setActiveTab("all")}
+              className="text-purple-500 hover:underline"
+            >
+              Browse All Services →
+            </button>
           </div>
         ) : (
           <div className="space-y-3">
             {filteredMy.map((item) => (
-              <LearningCard key={item.service_id} item={item} onToggle={handleToggle} />
+              <LearningCard
+                key={item.service_id}
+                item={item}
+                onToggle={handleToggle}
+                resources={resourcesMap[item.service_id] || []} // ✅
+              />
             ))}
           </div>
         )
       ) : filteredAll.length === 0 ? (
-        <div className="text-center py-24 text-gray-400 text-sm">
-          No services found.
-        </div>
+        <div className="text-center py-24 text-gray-400 text-sm">No services found.</div>
       ) : (
         <div className="space-y-3">
           {filteredAll.map((service) => (
-            <ServiceCard key={service.id} service={service} onMark={handleMark} />
+            <ServiceCard
+              key={service.id}
+              service={service}
+              onMark={handleMark}
+              resources={resourcesMap[service.id] || []} // ✅
+            />
           ))}
         </div>
       )}
