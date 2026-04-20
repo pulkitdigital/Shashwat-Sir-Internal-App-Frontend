@@ -10,8 +10,20 @@ const getYouTubeThumbnail = (url) => {
   return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : null;
 };
 
+// ✅ FIX: URL normalize — https:// already hai → as-is, nahi hai → prepend karo
+// Purane DB data ke liye bhi kaam karta hai
+const normalizeUrl = (url) => {
+  if (!url) return "#";
+  const trimmed = url.trim();
+  if (!trimmed) return "#";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;   // already has protocol
+  if (trimmed.startsWith("//")) return `https:${trimmed}`; // protocol-relative
+  return `https://${trimmed}`;                           // bare domain
+};
+
 const ResourceCard = ({ resource, onDelete, isAdmin }) => {
-  const thumbnail = isYouTube(resource.url) ? getYouTubeThumbnail(resource.url) : null;
+  const normalizedUrl = normalizeUrl(resource.url);
+  const thumbnail = isYouTube(normalizedUrl) ? getYouTubeThumbnail(normalizedUrl) : null;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden hover:border-blue-200 hover:shadow-sm transition">
@@ -24,7 +36,6 @@ const ResourceCard = ({ resource, onDelete, isAdmin }) => {
         <div className="flex items-start justify-between gap-2 mb-2">
           <div>
             <h3 className="font-semibold text-gray-900 text-sm leading-snug">{resource.title}</h3>
-            {/* ✅ service_title not service_name */}
             {resource.service_title && (
               <span className="text-xs text-gray-400 mt-0.5 block">📋 {resource.service_title}</span>
             )}
@@ -43,12 +54,13 @@ const ResourceCard = ({ resource, onDelete, isAdmin }) => {
         )}
         <div className="flex items-center justify-between">
           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-            isYouTube(resource.url) ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600"
+            isYouTube(normalizedUrl) ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600"
           }`}>
-            {isYouTube(resource.url) ? "▶ YouTube" : "🔗 Link"}
+            {isYouTube(normalizedUrl) ? "▶ YouTube" : "🔗 Link"}
           </span>
+          {/* ✅ FIX: normalizedUrl use ho raha hai — domain prepend nahi hoga */}
           <a
-            href={resource.url}
+            href={normalizedUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-blue-600 font-medium hover:underline"
@@ -62,7 +74,7 @@ const ResourceCard = ({ resource, onDelete, isAdmin }) => {
 };
 
 export default function Resources() {
-  const { isAdmin } = useAuth(); // ✅ isAdmin from context
+  const { isAdmin } = useAuth();
   const [resources, setResources] = useState([]);
   const [services, setServices]   = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -82,7 +94,6 @@ export default function Resources() {
     setLoading(true);
     try {
       const res = await resourceAPI.getAll();
-      // ✅ Backend returns { success: true, resources: [...] }
       setResources(res.data.resources || []);
     } catch (err) {
       console.error("Failed to fetch resources:", err.message);
@@ -105,9 +116,10 @@ export default function Resources() {
     try {
       const res = await resourceAPI.create({
         ...form,
+        // ✅ FIX: save karte waqt bhi URL normalize ho jaata hai
+        url: normalizeUrl(form.url),
         service_id: form.service_id ? parseInt(form.service_id) : null,
       });
-      // ✅ Backend returns { success: true, resource: {...} }
       setResources([res.data.resource, ...resources]);
       setForm({ title: "", url: "", description: "", service_id: "", resource_type: "video" });
       setShowForm(false);
@@ -168,10 +180,10 @@ export default function Resources() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">URL *</label>
               <input
-                type="url"
+                type="text"
                 value={form.url}
                 onChange={(e) => setForm({ ...form, url: e.target.value })}
-                placeholder="https://youtube.com/watch?v=..."
+                placeholder="https://youtube.com/watch?v=... ya youtube.com/..."
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               />
             </div>
@@ -196,7 +208,6 @@ export default function Resources() {
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               >
                 <option value="">None</option>
-                {/* ✅ s.title not s.name */}
                 {services.map((s) => (
                   <option key={s.id} value={s.id}>{s.title}</option>
                 ))}
