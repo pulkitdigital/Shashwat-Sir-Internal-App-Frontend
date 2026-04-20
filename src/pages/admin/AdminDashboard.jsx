@@ -108,7 +108,7 @@
 
 //   const handleDeleteUser = (uid, name) => {
 //     setModal({
-//       message: `"${name}" ko permanently remove karna chahte ho?`,
+//       message: `""Do you want to permanently remove \"${name}\"?"`,
 //       onConfirm: async () => {
 //         setModal(null);
 //         try {
@@ -121,8 +121,8 @@
 
 //   const handleRoleChange = (uid, newRole, name) => {
 //     const msg = newRole === "admin"
-//       ? `"${name}" ko Admin banana chahte ho? Unhe full admin access mil jaayega.`
-//       : `"${name}" ko Admin se Employee banana chahte ho?`;
+//       ? `"Do you want to make \"${name}\" an Admin? They will get full admin access."`
+//       : `"Do you want to change \"${name}\" from Admin to Employee?"`;
 //     setModal({
 //       message: msg,
 //       onConfirm: async () => {
@@ -433,7 +433,7 @@ export default function AdminDashboard() {
 
   const handleDeleteUser = (uid, name) => {
     setModal({
-      message: `"${name}" ko permanently remove karna chahte ho?`,
+      message: `""Do you want to permanently remove \"${name}\"?"`,
       onConfirm: async () => {
         setModal(null);
         try {
@@ -446,8 +446,8 @@ export default function AdminDashboard() {
 
   const handleRoleChange = (uid, newRole, name) => {
     const msg = newRole === "admin"
-      ? `"${name}" ko Admin banana chahte ho? Unhe full admin access mil jaayega.`
-      : `"${name}" ko Admin se Employee banana chahte ho?`;
+      ? `"Do you want to make \"${name}\" an Admin? They will get full admin access."`
+      : `"Do you want to change \"${name}\" from Admin to Employee?"`;
     setModal({
       message: msg,
       onConfirm: async () => {
