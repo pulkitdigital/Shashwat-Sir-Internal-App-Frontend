@@ -105,9 +105,9 @@ export default function AdminDashboard() {
   // ── Role change with confirmation ──
   const handleRoleChange = (uid, newRole, name) => {
     const msg =
-      newRole === "admin"
-        ? `"${name}" ko Employee se Admin banana chahte ho? Unhe poora admin access mil jaayega.`
-        : `"${name}" ko Admin se Employee banana chahte ho?`;
+  newRole === "admin"
+    ? `Do you want to promote "${name}" from Employee to Admin? They will get full admin access.`
+    : `Do you want to change "${name}" from Admin to Employee?`;
 
     setModal({
       message: msg,
