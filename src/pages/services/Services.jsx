@@ -235,7 +235,7 @@ export default function Services() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-20 text-gray-400">
           {activeTab === "mine"
-            ? "Aapne abhi koi service add nahi ki."
+            ? "You haven't added any services yet."
             : search
             ? "No services match your search."
             : "No services yet. Add one!"}

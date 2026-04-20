@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { resourceAPI, serviceAPI } from "../../services/api";
+import ResourceForm from "../../components/ResourceForm";
 
 const isYouTube = (url) =>
   url?.includes("youtube.com") || url?.includes("youtu.be");
@@ -10,17 +11,16 @@ const getYouTubeThumbnail = (url) => {
   return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : null;
 };
 
-// ✅ FIX: URL normalize — https:// already hai → as-is, nahi hai → prepend karo
-// Purane DB data ke liye bhi kaam karta hai
 const normalizeUrl = (url) => {
   if (!url) return "#";
   const trimmed = url.trim();
   if (!trimmed) return "#";
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;   // already has protocol
-  if (trimmed.startsWith("//")) return `https:${trimmed}`; // protocol-relative
-  return `https://${trimmed}`;                           // bare domain
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  return `https://${trimmed}`;
 };
 
+// ─── Resource Card ─────────────────────────────────────────────────────────────
 const ResourceCard = ({ resource, onDelete, isAdmin }) => {
   const normalizedUrl = normalizeUrl(resource.url);
   const thumbnail = isYouTube(normalizedUrl) ? getYouTubeThumbnail(normalizedUrl) : null;
@@ -58,7 +58,6 @@ const ResourceCard = ({ resource, onDelete, isAdmin }) => {
           }`}>
             {isYouTube(normalizedUrl) ? "▶ YouTube" : "🔗 Link"}
           </span>
-          {/* ✅ FIX: normalizedUrl use ho raha hai — domain prepend nahi hoga */}
           <a
             href={normalizedUrl}
             target="_blank"
@@ -73,17 +72,14 @@ const ResourceCard = ({ resource, onDelete, isAdmin }) => {
   );
 };
 
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function Resources() {
   const { isAdmin } = useAuth();
   const [resources, setResources] = useState([]);
-  const [services, setServices]   = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [search, setSearch]       = useState("");
-  const [showForm, setShowForm]   = useState(false);
-  const [formLoading, setFormLoading] = useState(false);
-  const [form, setForm] = useState({
-    title: "", url: "", description: "", service_id: "", resource_type: "video",
-  });
+  const [services,  setServices]  = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [search,    setSearch]    = useState("");
+  const [showForm,  setShowForm]  = useState(false);
 
   useEffect(() => {
     fetchResources();
@@ -108,26 +104,6 @@ export default function Resources() {
       const res = await serviceAPI.getAll();
       setServices(res.data.services || []);
     } catch {}
-  };
-
-  const handleAdd = async () => {
-    if (!form.title.trim() || !form.url.trim()) return;
-    setFormLoading(true);
-    try {
-      const res = await resourceAPI.create({
-        ...form,
-        // ✅ FIX: save karte waqt bhi URL normalize ho jaata hai
-        url: normalizeUrl(form.url),
-        service_id: form.service_id ? parseInt(form.service_id) : null,
-      });
-      setResources([res.data.resource, ...resources]);
-      setForm({ title: "", url: "", description: "", service_id: "", resource_type: "video" });
-      setShowForm(false);
-    } catch (err) {
-      console.error("Add resource failed:", err.message);
-    } finally {
-      setFormLoading(false);
-    }
   };
 
   const handleDelete = async (id) => {
@@ -162,75 +138,18 @@ export default function Resources() {
         </button>
       </div>
 
-      {/* Add Form */}
+      {/* ✅ Shared ResourceForm — serviceId null, services list pass karo */}
       {showForm && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Add New Resource</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Title *</label>
-              <input
-                type="text"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                placeholder="e.g. GST Filing Tutorial"
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">URL *</label>
-              <input
-                type="text"
-                value={form.url}
-                onChange={(e) => setForm({ ...form, url: e.target.value })}
-                placeholder="https://youtube.com/watch?v=... ya youtube.com/..."
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Type</label>
-              <select
-                value={form.resource_type}
-                onChange={(e) => setForm({ ...form, resource_type: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              >
-                <option value="video">Video</option>
-                <option value="article">Article</option>
-                <option value="pdf">PDF</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Related Service</label>
-              <select
-                value={form.service_id}
-                onChange={(e) => setForm({ ...form, service_id: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              >
-                <option value="">None</option>
-                {services.map((s) => (
-                  <option key={s.id} value={s.id}>{s.title}</option>
-                ))}
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
-              <input
-                type="text"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="Optional short description"
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              />
-            </div>
-          </div>
-          <button
-            onClick={handleAdd}
-            disabled={formLoading}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition"
-          >
-            {formLoading ? "Adding..." : "Add Resource"}
-          </button>
+        <div className="mb-6">
+          <ResourceForm
+            serviceId={null}
+            services={services}
+            onAdd={(newResource) => {
+              setResources([newResource, ...resources]);
+              setShowForm(false);
+            }}
+            onCancel={() => setShowForm(false)}
+          />
         </div>
       )}
 
@@ -255,7 +174,12 @@ export default function Resources() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((r) => (
-            <ResourceCard key={r.id} resource={r} onDelete={handleDelete} isAdmin={isAdmin} />
+            <ResourceCard
+              key={r.id}
+              resource={r}
+              onDelete={handleDelete}
+              isAdmin={isAdmin}
+            />
           ))}
         </div>
       )}

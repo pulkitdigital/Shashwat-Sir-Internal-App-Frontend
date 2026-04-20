@@ -2,22 +2,24 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { serviceAPI, employeeAPI, learningAPI } from "../../services/api";
+import ResourceForm from "../../components/ResourceForm";
 
 export default function ServiceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isAdmin, user } = useAuth();
 
-  const [service, setService]             = useState(null);
-  const [employees, setEmployees]         = useState([]);
-  const [resources, setResources]         = useState([]);
-  const [loading, setLoading]             = useState(true);
-  const [editing, setEditing]             = useState(false);
-  const [editForm, setEditForm]           = useState({ title: "", category: "", description: "" });
-  const [knowsService, setKnowsService]   = useState(false);
-  const [wantToLearn, setWantToLearn]     = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [updateError, setUpdateError]     = useState("");
+  const [service, setService]               = useState(null);
+  const [employees, setEmployees]           = useState([]);
+  const [resources, setResources]           = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [editing, setEditing]               = useState(false);
+  const [editForm, setEditForm]             = useState({ title: "", category: "", description: "" });
+  const [knowsService, setKnowsService]     = useState(false);
+  const [wantToLearn, setWantToLearn]       = useState(false);
+  const [actionLoading, setActionLoading]   = useState(false);
+  const [updateError, setUpdateError]       = useState("");
+  const [showResourceForm, setShowResourceForm] = useState(false); // ✅ NEW
 
   useEffect(() => {
     fetchServiceDetail();
@@ -49,7 +51,7 @@ export default function ServiceDetail() {
     }
   };
 
-  // ✅ Sirf creator hi edit kar sakta hai
+  // Sirf creator hi edit kar sakta hai
   const isOwner = service?.created_by === user?.uid;
 
   // ─── Update Service ──────────────────────────────────────────────────────────
@@ -116,6 +118,14 @@ export default function ServiceDetail() {
     }
   };
 
+  // ─── Resource icon helper ────────────────────────────────────────────────────
+  const resourceIcon = (type) => {
+    if (type === "video")   return "🎥";
+    if (type === "pdf")     return "📄";
+    if (type === "article") return "📝";
+    return "🔗";
+  };
+
   // ─── Loading ─────────────────────────────────────────────────────────────────
   if (loading) return (
     <div className="p-6 text-center text-gray-400 py-24">Loading...</div>
@@ -167,7 +177,6 @@ export default function ServiceDetail() {
               />
             </div>
 
-            {/* ✅ Error message */}
             {updateError && (
               <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{updateError}</p>
             )}
@@ -197,7 +206,6 @@ export default function ServiceDetail() {
                   <span className="px-3 py-0.5 bg-gray-100 text-gray-500 rounded-full text-sm">
                     {service.category || "General"}
                   </span>
-                  {/* ✅ Creator badge */}
                   <span className="text-xs text-gray-400">
                     Added by{" "}
                     <span className="font-medium text-gray-600">
@@ -208,7 +216,7 @@ export default function ServiceDetail() {
               </div>
 
               <div className="flex gap-2">
-                {/* ✅ Edit button — sirf owner ko dikhega */}
+                {/* Edit button — sirf owner ko dikhega */}
                 {isOwner && (
                   <button
                     onClick={() => setEditing(true)}
@@ -294,29 +302,49 @@ export default function ServiceDetail() {
           )}
         </div>
 
-        {/* Resources */}
+        {/* ─── Resources ──────────────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
-            📎 Resources ({resources.length})
-          </h2>
+          {/* Resources Header with + Add toggle */}
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+              📎 Resources ({resources.length})
+            </h2>
+            <button
+              onClick={() => setShowResourceForm(!showResourceForm)}
+              className="text-xs text-blue-600 font-medium hover:underline transition"
+            >
+              {showResourceForm ? "Cancel" : "+ Add"}
+            </button>
+          </div>
+
+          {/* ✅ Inline Resource Form — serviceId fixed hai */}
+          {showResourceForm && (
+            <div className="mb-4">
+              <ResourceForm
+                serviceId={parseInt(id)}
+                onAdd={(newResource) => {
+                  setResources([...resources, newResource]);
+                  setShowResourceForm(false);
+                }}
+                onCancel={() => setShowResourceForm(false)}
+              />
+            </div>
+          )}
+
+          {/* Resource List */}
           {resources.length === 0 ? (
             <p className="text-sm text-gray-400">No resources added yet.</p>
           ) : (
             <ul className="space-y-2">
               {resources.map((r) => (
-                <li>
-
-                  <a key={r.id}
+                <li key={r.id}>
+                  <a
                     href={r.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
                   >
-                    <span>
-                      {r.resource_type === "video"   ? "🎥" :
-                       r.resource_type === "pdf"     ? "📄" :
-                       r.resource_type === "article" ? "📝" : "🔗"}
-                    </span>
+                    <span>{resourceIcon(r.resource_type)}</span>
                     {r.title}
                   </a>
                 </li>
