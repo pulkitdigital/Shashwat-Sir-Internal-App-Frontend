@@ -3,6 +3,31 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { adminAPI } from "../../services/api";
 
+// ─── Confirmation Modal ───────────────────────────────────────────────────────
+const ConfirmModal = ({ message, onConfirm, onCancel }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
+      <h3 className="text-base font-semibold text-gray-900 mb-2">Confirm Action</h3>
+      <p className="text-sm text-gray-500 mb-6">{message}</p>
+      <div className="flex gap-3 justify-end">
+        <button
+          onClick={onCancel}
+          className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onConfirm}
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+        >
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+// ─── Stat Card ────────────────────────────────────────────────────────────────
 const StatCard = ({ label, value, icon, color, sub }) => (
   <div className={`rounded-2xl border p-5 ${color}`}>
     <div className="flex items-center justify-between mb-3">
@@ -14,6 +39,7 @@ const StatCard = ({ label, value, icon, color, sub }) => (
   </div>
 );
 
+// ─── Section Wrapper ──────────────────────────────────────────────────────────
 const Section = ({ title, children }) => (
   <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
     <div className="px-6 py-4 border-b border-gray-100">
@@ -23,18 +49,19 @@ const Section = ({ title, children }) => (
   </div>
 );
 
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const { isAdmin } = useAuth();
   const navigate    = useNavigate();
+
   const [stats,   setStats]   = useState(null);
   const [users,   setUsers]   = useState([]);
   const [loading, setLoading] = useState(true);
+  const [modal,   setModal]   = useState(null);
+  // modal = { message, onConfirm } | null
 
   useEffect(() => {
-    if (!isAdmin) {
-      navigate("/dashboard");
-      return;
-    }
+    if (!isAdmin) { navigate("/dashboard"); return; }
     fetchAdminData();
   }, [isAdmin]);
 
@@ -47,7 +74,7 @@ export default function AdminDashboard() {
       ]);
       setStats(statsRes.data.stats);
 
-      // ✅ Sirf employees dikhao — admins filter out
+      // Sirf employees dikhao — admins filter out
       const onlyEmployees = (usersRes.data.users || []).filter(
         (u) => u.role !== "admin"
       );
@@ -59,31 +86,62 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteUser = async (uid) => {
-    if (!window.confirm("Remove this employee permanently?")) return;
-    try {
-      await adminAPI.deleteUser(uid);
-      setUsers((prev) => prev.filter((u) => u.firebase_uid !== uid));
-    } catch (err) {
-      console.error("Delete user failed:", err.message);
-    }
+  // ── Delete with confirmation ──
+  const handleDeleteUser = (uid, name) => {
+    setModal({
+      message: `"${name}" ko permanently remove karna chahte ho? Yeh action undo nahi ho sakta.`,
+      onConfirm: async () => {
+        setModal(null);
+        try {
+          await adminAPI.deleteUser(uid);
+          setUsers((prev) => prev.filter((u) => u.firebase_uid !== uid));
+        } catch (err) {
+          console.error("Delete user failed:", err.message);
+        }
+      },
+    });
   };
 
-  const handleRoleChange = async (uid, newRole) => {
-    try {
-      await adminAPI.updateUserRole(uid, newRole);
-      // Agar employee ko admin banaya toh list se remove karo
-      if (newRole === "admin") {
-        setUsers((prev) => prev.filter((u) => u.firebase_uid !== uid));
-      } else {
-        setUsers((prev) =>
-          prev.map((u) => (u.firebase_uid === uid ? { ...u, role: newRole } : u))
-        );
-      }
-    } catch (err) {
-      console.error("Role update failed:", err.message);
-    }
+  // ── Role change with confirmation ──
+  const handleRoleChange = (uid, newRole, name) => {
+    const msg =
+      newRole === "admin"
+        ? `"${name}" ko Employee se Admin banana chahte ho? Unhe poora admin access mil jaayega.`
+        : `"${name}" ko Admin se Employee banana chahte ho?`;
+
+    setModal({
+      message: msg,
+      onConfirm: async () => {
+        setModal(null);
+        try {
+          await adminAPI.updateUserRole(uid, newRole);
+          if (newRole === "admin") {
+            // Admin ban gaya — employee list se remove karo
+            setUsers((prev) => prev.filter((u) => u.firebase_uid !== uid));
+          } else {
+            setUsers((prev) =>
+              prev.map((u) =>
+                u.firebase_uid === uid ? { ...u, role: newRole } : u
+              )
+            );
+          }
+        } catch (err) {
+          console.error("Role update failed:", err.message);
+          setUsers((prev) => [...prev]);
+        }
+      },
+    });
   };
+
+  // ── Deduplicate skill_gaps by title (frontend safety net) ──
+  const uniqueSkillGaps = stats?.skill_gaps
+    ? Object.values(
+        stats.skill_gaps.reduce((acc, gap) => {
+          if (!acc[gap.title]) acc[gap.title] = gap;
+          return acc;
+        }, {})
+      )
+    : [];
 
   if (loading) return (
     <div className="p-6 text-center py-24 text-gray-400">Loading admin panel...</div>
@@ -92,7 +150,19 @@ export default function AdminDashboard() {
   return (
     <div className="p-6 max-w-6xl mx-auto">
 
-      {/* Header */}
+      {/* ── Confirmation Modal ── */}
+      {modal && (
+        <ConfirmModal
+          message={modal.message}
+          onConfirm={modal.onConfirm}
+          onCancel={() => {
+            setModal(null);
+            setUsers((prev) => [...prev]); // select reset
+          }}
+        />
+      )}
+
+      {/* ── Header ── */}
       <div className="mb-8">
         <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
           🔑 Admin Panel
@@ -101,24 +171,27 @@ export default function AdminDashboard() {
         <p className="text-sm text-gray-500 mt-0.5">Manage your CA firm workspace</p>
       </div>
 
-      {/* Stats Grid */}
+      {/* ── Stats Grid ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total Employees"    value={stats?.total_employees}      icon="👥" color="bg-blue-50 border-blue-100" />
-        <StatCard label="Total Services"     value={stats?.total_services}        icon="📋" color="bg-green-50 border-green-100" />
-        <StatCard label="Learning Requests"  value={stats?.total_learning_marks}  icon="📚" color="bg-purple-50 border-purple-100" sub="Want to Learn marked" />
-        <StatCard label="Resources"          value={stats?.total_resources}       icon="🎥" color="bg-orange-50 border-orange-100" />
+        <StatCard label="Total Employees"   value={stats?.total_employees}     icon="👥" color="bg-blue-50 border-blue-100" />
+        <StatCard label="Total Services"    value={stats?.total_services}       icon="📋" color="bg-green-50 border-green-100" />
+        <StatCard label="Learning Requests" value={stats?.total_learning_marks} icon="📚" color="bg-purple-50 border-purple-100" sub="Want to Learn marked" />
+        <StatCard label="Resources"         value={stats?.total_resources}      icon="🎥" color="bg-orange-50 border-orange-100" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
-        {/* Skill Gaps */}
+        {/* ── Skill Gaps (deduplicated) ── */}
         <Section title="📊 Skill Gaps — No experts yet">
-          {!stats?.skill_gaps?.length ? (
+          {!uniqueSkillGaps.length ? (
             <p className="text-sm text-gray-400">No skill gaps found. Great coverage!</p>
           ) : (
             <div className="space-y-2">
-              {stats.skill_gaps.map((gap, i) => (
-                <div key={i} className="flex items-center justify-between p-3 bg-red-50 rounded-xl border border-red-100">
+              {uniqueSkillGaps.map((gap, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between p-3 bg-red-50 rounded-xl border border-red-100"
+                >
                   <p className="text-sm font-medium text-gray-800">{gap.title}</p>
                   <span className="text-xs text-red-600 font-semibold">0 experts</span>
                 </div>
@@ -127,7 +200,7 @@ export default function AdminDashboard() {
           )}
         </Section>
 
-        {/* Top Wanted */}
+        {/* ── Most Wanted to Learn ── */}
         <Section title="🔥 Most Wanted to Learn">
           {!stats?.top_wanted_services?.length ? (
             <p className="text-sm text-gray-400">No learning interests marked yet.</p>
@@ -146,7 +219,7 @@ export default function AdminDashboard() {
         </Section>
       </div>
 
-      {/* User Management — only employees */}
+      {/* ── User Management ── */}
       <Section title={`👥 Manage Employees (${users.length})`}>
         <div className="space-y-3">
           {users.length === 0 ? (
@@ -159,19 +232,23 @@ export default function AdminDashboard() {
               >
                 <div>
                   <p className="text-sm font-medium text-gray-800">{u.full_name}</p>
-                  <p className="text-xs text-gray-400">{u.email} · {u.designation || "—"}</p>
+                  <p className="text-xs text-gray-400">
+                    {u.email} · {u.designation || "—"}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <select
                     value={u.role}
-                    onChange={(e) => handleRoleChange(u.firebase_uid, e.target.value)}
+                    onChange={(e) =>
+                      handleRoleChange(u.firebase_uid, e.target.value, u.full_name)
+                    }
                     className="text-xs px-2 py-1 rounded-lg border border-gray-200 bg-white focus:outline-none"
                   >
                     <option value="employee">Employee</option>
                     <option value="admin">Admin</option>
                   </select>
                   <button
-                    onClick={() => handleDeleteUser(u.firebase_uid)}
+                    onClick={() => handleDeleteUser(u.firebase_uid, u.full_name)}
                     className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg transition"
                   >
                     Remove
@@ -183,7 +260,7 @@ export default function AdminDashboard() {
         </div>
       </Section>
 
-      {/* Quick Actions */}
+      {/* ── Quick Actions ── */}
       <div className="mt-4">
         <Section title="⚡ Quick Actions">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
