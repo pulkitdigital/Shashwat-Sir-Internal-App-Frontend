@@ -46,12 +46,27 @@ api.interceptors.response.use(
   }
 );
 
+// ─── Wake-up Ping ─────────────────────────────────────────────────────────────
+// Render free tier cold start fix
+// main.jsx se call hota hai jab frontend load hota hai
+// Fire and forget — app ko kabhi block nahi karta
+export const pingBackend = () => {
+  const baseURL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+
+  fetch(`${baseURL}/health`, {
+    method: "GET",
+    signal: AbortSignal.timeout(60000), // 60s — Render cold start slow ho sakta hai
+  })
+    .then(() => console.log("✅ Backend is awake"))
+    .catch(() => console.warn("⚠️ Backend ping failed — may still be starting"));
+  // No await — fire and forget
+};
+
 // ══════════════════════════════════════════════════════════════════════════════
 // API Methods
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
-// Call after Firebase signup to save user into PostgreSQL
 export const authAPI = {
   register : (data) => api.post("/auth/register", data), // { firebase_uid, email, full_name, designation, department, phone }
   getMe    : ()     => api.get("/auth/me"),
@@ -100,19 +115,12 @@ export const resourceAPI = {
   delete  : (id)         => api.delete(`/resources/${id}`),   // 🔑 Admin only
 };
 
-// // ─── Admin ────────────────────────────────────────────────────────────────────
-// export const adminAPI = {
-//   getStats      : ()            => api.get("/admin/stats"),
-//   getUsers      : ()            => api.get("/admin/users"),
-//   updateRole    : (uid, role)   => api.put(`/admin/users/${uid}/role`, { role }), // role: "employee" | "admin"
-//   deleteUser    : (uid)         => api.delete(`/admin/users/${uid}`),
-// };
-
+// ─── Admin ────────────────────────────────────────────────────────────────────
 export const adminAPI = {
   getAdminStats:     ()           => api.get('/admin/stats'),
   getAdminUsers:     ()           => api.get('/admin/users'),
   updateUserRole:    (uid, role)  => api.put(`/admin/users/${uid}/role`, { role }),
-  updateUserProfile: (uid, data)  => api.put(`/admin/users/${uid}/profile`, data),  // ← YE ADD KARO
+  updateUserProfile: (uid, data)  => api.put(`/admin/users/${uid}/profile`, data),
   deleteUser:        (uid)        => api.delete(`/admin/users/${uid}`),
 };
 
