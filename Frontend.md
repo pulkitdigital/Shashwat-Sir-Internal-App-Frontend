@@ -17,45 +17,57 @@
 
 ```
 frontend/
+├── cors.json
+├── eslint.config.js
+├── index.html
+├── package.json
+├── README.md
+├── tailwind.config.js
+├── vercel.json
+├── vite.config.js
 ├── public/
 ├── src/
+│   ├── App.css
+│   ├── App.jsx                  ✅ DONE — routing setup
+│   ├── index.css
+│   ├── main.jsx
+│   ├── assets/
 │   ├── components/
 │   │   ├── Navbar.jsx           # Top navigation bar
-│   │   ├── Sidebar.jsx          # Left sidebar with nav links
-│   │   └── ProtectedRoute.jsx   # Auth guard for private routes
+│   │   ├── ProtectedRoute.jsx   # Auth guard for private routes
+│   │   ├── ResourceForm.jsx     # Form for adding resources
+│   │   └── Sidebar.jsx          # Left sidebar with nav links
 │   ├── context/
 │   │   └── AuthContext.jsx      # Firebase auth state (global)
 │   ├── hooks/
 │   │   └── useAuth.js           # Custom hook: const { user } = useAuth()
 │   ├── pages/
+│   │   ├── admin/
+│   │   │   └── AdminDashboard.jsx # Admin-only panel
 │   │   ├── auth/
+│   │   │   ├── ForgotPassword.jsx # Forgot password page
 │   │   │   ├── Login.jsx        # Firebase email/password login
 │   │   │   └── Register.jsx     # Firebase signup + POST /api/auth/register
 │   │   ├── dashboard/
 │   │   │   └── Dashboard.jsx    # Home after login
-│   │   ├── profile/
-│   │   │   └── Profile.jsx      # My profile + skills management
-│   │   ├── services/
-│   │   │   ├── Services.jsx     # List all services
-│   │   │   └── ServiceDetail.jsx# Single service + employees + resources
 │   │   ├── employees/
 │   │   │   └── Employees.jsx    # Employee directory
 │   │   ├── learning/
 │   │   │   └── Learning.jsx     # My "Want to Learn" list
+│   │   ├── profile/
+│   │   │   └── Profile.jsx      # My profile + skills management
 │   │   ├── resources/
 │   │   │   └── Resources.jsx    # Lecture/video links
-│   │   └── admin/
-│   │       └── AdminDashboard.jsx # Admin-only panel
+│   │   ├── services/
+│   │   │   ├── ServiceDetail.jsx# Single service + employees + resources
+│   │   │   └── Services.jsx     # List all services
+│   │   └── skills/
+│   │       └── Skills.jsx       # Skills management page
 │   ├── services/
-│   │   └── api.js               # All Axios API calls (see below)
+│   │   ├── api.js               # All Axios API calls (see below)
+│   │   └── authService.js       # Authentication service
 │   ├── utils/
 │   │   └── firebaseConfig.js    # Firebase SDK init
-│   ├── App.jsx                  ✅ DONE — routing setup
-│   ├── main.jsx
-│   └── index.css
-├── vite.config.js
-├── tailwind.config.js
-└── package.json
 ```
 
 ---
@@ -80,6 +92,7 @@ VITE_API_BASE_URL=http://localhost:5000/api
 |-------|------|--------|
 | `/login` | Login.jsx | Public |
 | `/register` | Register.jsx | Public |
+| `/forgot-password` | ForgotPassword.jsx | Public |
 | `/dashboard` | Dashboard.jsx | Employee + Admin |
 | `/profile` | Profile.jsx | Employee + Admin |
 | `/services` | Services.jsx | Employee + Admin |
@@ -87,6 +100,7 @@ VITE_API_BASE_URL=http://localhost:5000/api
 | `/employees` | Employees.jsx | Employee + Admin |
 | `/learning` | Learning.jsx | Employee + Admin |
 | `/resources` | Resources.jsx | Employee + Admin |
+| `/skills` | Skills.jsx | Employee + Admin |
 | `/admin` | AdminDashboard.jsx | Admin Only |
 
 ---

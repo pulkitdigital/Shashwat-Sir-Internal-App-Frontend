@@ -1,10 +1,160 @@
+// import axios from "axios";
+// import { auth } from "../utils/firebaseConfig";
+
+// // ─── Axios Instance ────────────────────────────────────────────────────────────
+// const api = axios.create({
+//   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api",
+//   headers: { "Content-Type": "application/json" },
+//   timeout: 10000,
+// });
+
+// // ─── Request Interceptor ───────────────────────────────────────────────────────
+// // Automatically attaches Firebase ID Token to every request
+// api.interceptors.request.use(
+//   async (config) => {
+//     const user = auth.currentUser;
+//     if (user) {
+//       const token = await user.getIdToken(true);
+//       config.headers.Authorization = `Bearer ${token}`;
+//     }
+//     return config;
+//   },
+//   (error) => Promise.reject(error)
+// );
+
+// // ─── Response Interceptor ─────────────────────────────────────────────────────
+// // Global error handling
+// api.interceptors.response.use(
+//   (response) => response,
+//   (error) => {
+//     const status = error.response?.status;
+
+//     if (status === 401) {
+//       console.warn("Unauthorized — redirecting to login...");
+//       window.location.href = "/login";
+//     }
+
+//     if (status === 403) {
+//       console.warn("Access denied. Admin only.");
+//     }
+
+//     if (status === 500) {
+//       console.error("Server error. Please try again later.");
+//     }
+
+//     return Promise.reject(error);
+//   }
+// );
+
+// // ─── Wake-up Ping ─────────────────────────────────────────────────────────────
+// // Render free tier cold start fix
+// // main.jsx se call hota hai jab frontend load hota hai
+// // Fire and forget — app ko kabhi block nahi karta
+// export const pingBackend = () => {
+//   const baseURL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+
+//   fetch(`${baseURL}/health`, {
+//     method: "GET",
+//     signal: AbortSignal.timeout(60000), // 60s — Render cold start slow ho sakta hai
+//   })
+//     .then(() => console.log("✅ Backend is awake"))
+//     .catch(() => console.warn("⚠️ Backend ping failed — may still be starting"));
+//   // No await — fire and forget
+// };
+
+// // ══════════════════════════════════════════════════════════════════════════════
+// // API Methods
+// // ══════════════════════════════════════════════════════════════════════════════
+
+// // ─── Auth ─────────────────────────────────────────────────────────────────────
+// export const authAPI = {
+//   register : (data) => api.post("/auth/register", data), // { firebase_uid, email, full_name, designation, department, phone }
+//   getMe    : ()     => api.get("/auth/me"),
+// };
+
+// // ─── User / Profile ───────────────────────────────────────────────────────────
+// export const userAPI = {
+//   getProfile    : ()     => api.get("/users/profile"),
+//   updateProfile : (data) => api.put("/users/profile", data), // { full_name, designation, department, phone, avatar_url }
+// };
+
+// // ─── Services ─────────────────────────────────────────────────────────────────
+// export const serviceAPI = {
+//   getAll  : ()           => api.get("/services"),
+//   getById : (id)         => api.get(`/services/${id}`),
+//   create  : (data)       => api.post("/services", data),       // { title, description, category }
+//   update  : (id, data)   => api.put(`/services/${id}`, data),
+//   delete  : (id)         => api.delete(`/services/${id}`),     // 🔑 Admin only
+// };
+
+// // ─── Employees ────────────────────────────────────────────────────────────────
+// export const employeeAPI = {
+//   getAll        : ()           => api.get("/employees"),
+//   getByUid      : (uid)        => api.get(`/employees/${uid}`),
+
+//   // Skills — what the employee KNOWS
+//   addSkill      : (data)       => api.post("/employees/services", data),          // { service_id, proficiency }
+//   addCustomSkill: (data)       => api.post("/employees/services/custom", data),   // { title, proficiency } ← NEW
+//   removeSkill   : (serviceId)  => api.delete(`/employees/services/${serviceId}`),
+// };
+
+// // ─── Learning (Want to Learn) ─────────────────────────────────────────────────
+// export const learningAPI = {
+//   getMine       : ()                  => api.get("/learning"),
+//   getAll        : ()                  => api.get("/learning/all"),                // 🔑 Admin only
+//   add           : (data)              => api.post("/learning", data),              // { service_id, status }
+//   addCustom    : (data)              => api.post("/learning/custom", data),  // ← YE ADD KARO
+//   updateStatus  : (serviceId, data)   => api.put(`/learning/${serviceId}`, data), // { status: "in_progress" | "completed" }
+//   remove        : (serviceId)         => api.delete(`/learning/${serviceId}`),
+// };
+
+
+// // ─── Resources ────────────────────────────────────────────────────────────────
+// export const resourceAPI = {
+//   getAll  : (serviceId)  => api.get("/resources", {
+//     params: serviceId ? { service_id: serviceId } : {},
+//   }),
+//   create  : (data)       => api.post("/resources", data),     // { title, description, url, resource_type, service_id }
+//   delete  : (id)         => api.delete(`/resources/${id}`),   // 🔑 Admin only
+// };
+
+// // ─── Admin ────────────────────────────────────────────────────────────────────
+// export const adminAPI = {
+//   getAdminStats:     ()           => api.get('/admin/stats'),
+//   getAdminUsers:     ()           => api.get('/admin/users'),
+//   updateUserRole:    (uid, role)  => api.put(`/admin/users/${uid}/role`, { role }),
+//   updateUserProfile: (uid, data)  => api.put(`/admin/users/${uid}/profile`, data),
+//   deleteUser:        (uid)        => api.delete(`/admin/users/${uid}`),
+// };
+
+// export default api;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import axios from "axios";
 import { auth } from "../utils/firebaseConfig";
 
 // ─── Axios Instance ────────────────────────────────────────────────────────────
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api",
-  headers: { "Content-Type": "application/json" },
+  // ❌ REMOVED: default JSON header (important for file upload)
   timeout: 10000,
 });
 
@@ -23,7 +173,6 @@ api.interceptors.request.use(
 );
 
 // ─── Response Interceptor ─────────────────────────────────────────────────────
-// Global error handling
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -47,19 +196,15 @@ api.interceptors.response.use(
 );
 
 // ─── Wake-up Ping ─────────────────────────────────────────────────────────────
-// Render free tier cold start fix
-// main.jsx se call hota hai jab frontend load hota hai
-// Fire and forget — app ko kabhi block nahi karta
 export const pingBackend = () => {
   const baseURL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
   fetch(`${baseURL}/health`, {
     method: "GET",
-    signal: AbortSignal.timeout(60000), // 60s — Render cold start slow ho sakta hai
+    signal: AbortSignal.timeout(60000),
   })
     .then(() => console.log("✅ Backend is awake"))
     .catch(() => console.warn("⚠️ Backend ping failed — may still be starting"));
-  // No await — fire and forget
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -68,63 +213,73 @@ export const pingBackend = () => {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 export const authAPI = {
-  register : (data) => api.post("/auth/register", data), // { firebase_uid, email, full_name, designation, department, phone }
-  getMe    : ()     => api.get("/auth/me"),
+  register: (data) => api.post("/auth/register", data),
+  getMe: () => api.get("/auth/me"),
 };
 
 // ─── User / Profile ───────────────────────────────────────────────────────────
 export const userAPI = {
-  getProfile    : ()     => api.get("/users/profile"),
-  updateProfile : (data) => api.put("/users/profile", data), // { full_name, designation, department, phone, avatar_url }
+  getProfile: () => api.get("/users/profile"),
+  updateProfile: (data) => api.put("/users/profile", data),
 };
 
 // ─── Services ─────────────────────────────────────────────────────────────────
 export const serviceAPI = {
-  getAll  : ()           => api.get("/services"),
-  getById : (id)         => api.get(`/services/${id}`),
-  create  : (data)       => api.post("/services", data),       // { title, description, category }
-  update  : (id, data)   => api.put(`/services/${id}`, data),
-  delete  : (id)         => api.delete(`/services/${id}`),     // 🔑 Admin only
+  getAll: () => api.get("/services"),
+  getById: (id) => api.get(`/services/${id}`),
+  create: (data) => api.post("/services", data),
+  update: (id, data) => api.put(`/services/${id}`, data),
+  delete: (id) => api.delete(`/services/${id}`),
 };
 
 // ─── Employees ────────────────────────────────────────────────────────────────
 export const employeeAPI = {
-  getAll        : ()           => api.get("/employees"),
-  getByUid      : (uid)        => api.get(`/employees/${uid}`),
+  getAll: () => api.get("/employees"),
+  getByUid: (uid) => api.get(`/employees/${uid}`),
 
-  // Skills — what the employee KNOWS
-  addSkill      : (data)       => api.post("/employees/services", data),          // { service_id, proficiency }
-  addCustomSkill: (data)       => api.post("/employees/services/custom", data),   // { title, proficiency } ← NEW
-  removeSkill   : (serviceId)  => api.delete(`/employees/services/${serviceId}`),
+  addSkill: (data) => api.post("/employees/services", data),
+  addCustomSkill: (data) => api.post("/employees/services/custom", data),
+  removeSkill: (serviceId) => api.delete(`/employees/services/${serviceId}`),
 };
 
-// ─── Learning (Want to Learn) ─────────────────────────────────────────────────
+// ─── Learning ─────────────────────────────────────────────────────────────────
 export const learningAPI = {
-  getMine       : ()                  => api.get("/learning"),
-  getAll        : ()                  => api.get("/learning/all"),                // 🔑 Admin only
-  add           : (data)              => api.post("/learning", data),              // { service_id, status }
-  addCustom    : (data)              => api.post("/learning/custom", data),  // ← YE ADD KARO
-  updateStatus  : (serviceId, data)   => api.put(`/learning/${serviceId}`, data), // { status: "in_progress" | "completed" }
-  remove        : (serviceId)         => api.delete(`/learning/${serviceId}`),
+  getMine: () => api.get("/learning"),
+  getAll: () => api.get("/learning/all"),
+  add: (data) => api.post("/learning", data),
+  addCustom: (data) => api.post("/learning/custom"),
+  updateStatus: (serviceId, data) => api.put(`/learning/${serviceId}`, data),
+  remove: (serviceId) => api.delete(`/learning/${serviceId}`),
 };
-
 
 // ─── Resources ────────────────────────────────────────────────────────────────
 export const resourceAPI = {
-  getAll  : (serviceId)  => api.get("/resources", {
-    params: serviceId ? { service_id: serviceId } : {},
-  }),
-  create  : (data)       => api.post("/resources", data),     // { title, description, url, resource_type, service_id }
-  delete  : (id)         => api.delete(`/resources/${id}`),   // 🔑 Admin only
+  getAll: (serviceId) =>
+    api.get("/resources", {
+      params: serviceId ? { service_id: serviceId } : {},
+    }),
+
+  // ✅ FIXED: Upload PDF
+  uploadPdf: (formData) =>
+    api.post("/resources/upload-pdf", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }),
+
+  create: (data) => api.post("/resources", data),
+  delete: (id) => api.delete(`/resources/${id}`),
 };
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
 export const adminAPI = {
-  getAdminStats:     ()           => api.get('/admin/stats'),
-  getAdminUsers:     ()           => api.get('/admin/users'),
-  updateUserRole:    (uid, role)  => api.put(`/admin/users/${uid}/role`, { role }),
-  updateUserProfile: (uid, data)  => api.put(`/admin/users/${uid}/profile`, data),
-  deleteUser:        (uid)        => api.delete(`/admin/users/${uid}`),
+  getAdminStats: () => api.get("/admin/stats"),
+  getAdminUsers: () => api.get("/admin/users"),
+  updateUserRole: (uid, role) =>
+    api.put(`/admin/users/${uid}/role`, { role }),
+  updateUserProfile: (uid, data) =>
+    api.put(`/admin/users/${uid}/profile`, data),
+  deleteUser: (uid) => api.delete(`/admin/users/${uid}`),
 };
 
 export default api;
