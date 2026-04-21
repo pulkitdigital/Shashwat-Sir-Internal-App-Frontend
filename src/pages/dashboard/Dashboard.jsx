@@ -89,7 +89,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard label="Employees"     value={loading ? "—" : stats.total_employees}      icon="👥" color="bg-blue-50 text-blue-600" />
         <StatCard label="Services"      value={loading ? "—" : stats.total_services}        icon="📋" color="bg-green-50 text-green-600" />
-        <StatCard label="Want to Learn" value={loading ? "—" : stats.total_learning_marks}  icon="📚" color="bg-purple-50 text-purple-600" />
+        {/* <StatCard label="Want to Learn" value={loading ? "—" : stats.total_learning_marks}  icon="📚" color="bg-purple-50 text-purple-600" /> */}
         <StatCard label="Resources"     value={loading ? "—" : stats.total_resources}       icon="🎥" color="bg-orange-50 text-orange-600" />
       </div>
 

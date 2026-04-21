@@ -9,7 +9,7 @@ import { useAuth } from "./context/AuthContext";
 // Auth Pages
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
-
+import ForgotPassword from "./pages/auth/ForgotPassword";
 // Layout Components
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
@@ -63,6 +63,7 @@ const App = () => {
           path="/login"
           element={!user ? <Login /> : <Navigate to="/dashboard" replace />}
         />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route
           path="/register"
           element={!user ? <Register /> : <Navigate to="/dashboard" replace />}

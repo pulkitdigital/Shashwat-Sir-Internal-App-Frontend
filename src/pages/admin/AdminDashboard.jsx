@@ -76,11 +76,10 @@
 //   const { isAdmin } = useAuth();
 //   const navigate    = useNavigate();
 
-//   const [stats,    setStats]    = useState(null);
-//   const [users,    setUsers]    = useState([]);
-//   const [loading,  setLoading]  = useState(true);
-//   const [modal,    setModal]    = useState(null);
-//   const [skillTab, setSkillTab] = useState("all");
+//   const [stats,   setStats]   = useState(null);
+//   const [users,   setUsers]   = useState([]);
+//   const [loading, setLoading] = useState(true);
+//   const [modal,   setModal]   = useState(null);
 
 //   useEffect(() => {
 //     if (!isAdmin) { navigate("/dashboard"); return; }
@@ -94,8 +93,6 @@
 //         adminAPI.getAdminStats(),
 //         adminAPI.getAdminUsers(),
 //       ]);
-
-//       // ✅ Backend response directly use kar rahe hain
 //       const statsData = statsRes.data?.stats || statsRes.data || {};
 //       setStats(statsData);
 //       setUsers(usersRes.data.users || []);
@@ -146,10 +143,20 @@
 //       ).sort((a, b) => b.interest_count - a.interest_count)
 //     : [];
 
-//   // ── Service expert counts ──
-//   const allServiceCounts = stats?.service_expert_counts || [];
-//   const skillGaps        = allServiceCounts.filter((s) => parseInt(s.expert_count) === 0);
-//   const skillRows        = skillTab === "gaps" ? skillGaps : allServiceCounts;
+//   // ── Service counts — deduplicate by title, merge total_knows ──
+//   const allServiceCounts = stats?.service_expert_counts
+//     ? Object.values(
+//         stats.service_expert_counts.reduce((acc, s) => {
+//           const key = s.title?.trim().toLowerCase();
+//           if (!acc[key]) {
+//             acc[key] = { title: s.title, total_knows: Number(s.total_knows) || 0 };
+//           } else {
+//             acc[key].total_knows += Number(s.total_knows) || 0;
+//           }
+//           return acc;
+//         }, {})
+//       ).sort((a, b) => b.total_knows - a.total_knows)
+//     : [];
 
 //   const admins    = users.filter((u) => u.role === "admin");
 //   const employees = users.filter((u) => u.role === "employee");
@@ -182,57 +189,25 @@
 
 //       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
-//         {/* ── Service Expert Coverage ── */}
-//         <Section title="📊 Service Expert Coverage">
-//           <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit mb-4">
-//             {[
-//               { key: "all",  label: `All Services (${allServiceCounts.length})` },
-//               { key: "gaps", label: `Skill Gaps (${skillGaps.length})` },
-//             ].map((tab) => (
-//               <button
-//                 key={tab.key}
-//                 onClick={() => setSkillTab(tab.key)}
-//                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-//                   skillTab === tab.key
-//                     ? "bg-white text-gray-900 shadow-sm"
-//                     : "text-gray-500 hover:text-gray-700"
-//                 }`}
-//               >
-//                 {tab.label}
-//               </button>
-//             ))}
-//           </div>
-
-//           {skillRows.length === 0 ? (
-//             <p className="text-sm text-gray-400">
-//               {skillTab === "gaps"
-//                 ? "No skill gaps! Sab services mein experts hain. 🎉"
-//                 : "No services found."}
-//             </p>
+//         {/* ── Service Coverage ── */}
+//         <Section title={`📊 Service Coverage (${allServiceCounts.length})`}>
+//           {allServiceCounts.length === 0 ? (
+//             <p className="text-sm text-gray-400">No services found.</p>
 //           ) : (
 //             <div className="space-y-2">
-//               {skillRows.map((s) => {
-//                 const experts = parseInt(s.expert_count);
-//                 const total   = parseInt(s.total_knows);
-//                 const isGap   = experts === 0;
+//               {allServiceCounts.map((s, i) => {
+//                 const total = s.total_knows || 0;
 //                 return (
 //                   <div
-//                     key={s.id}
-//                     className={`flex items-center justify-between p-3 rounded-xl border ${
-//                       isGap ? "bg-red-50 border-red-100" : "bg-green-50 border-green-100"
-//                     }`}
+//                     key={i}
+//                     className="flex items-center justify-between p-3 rounded-xl border bg-gray-50 border-gray-100"
 //                   >
 //                     <p className="text-sm font-medium text-gray-800">{s.title}</p>
-//                     <div className="flex items-center gap-2 text-xs font-semibold flex-shrink-0">
-//                       <span className={`px-2 py-0.5 rounded-full ${
-//                         experts > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
-//                       }`}>
-//                         {experts} expert{experts !== 1 ? "s" : ""}
-//                       </span>
-//                       <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
-//                         {total} total
-//                       </span>
-//                     </div>
+//                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+//                       total > 0 ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-600"
+//                     }`}>
+//                       {total} {total === 1 ? "employee" : "employees"}
+//                     </span>
 //                   </div>
 //                 );
 //               })}
@@ -313,19 +288,6 @@
 // }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -347,51 +309,54 @@ const ConfirmModal = ({ message, onConfirm, onCancel }) => (
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 const StatCard = ({ label, value, icon, color, sub }) => (
-  <div className={`rounded-2xl border p-5 ${color}`}>
-    <span className="text-2xl">{icon}</span>
-    <p className="text-3xl font-bold text-gray-900 mt-3">{value ?? "—"}</p>
-    <p className="text-sm font-medium text-gray-700 mt-0.5">{label}</p>
-    {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+  <div className={`rounded-2xl border p-4 md:p-5 ${color}`}>
+    <span className="text-xl md:text-2xl">{icon}</span>
+    <p className="text-2xl md:text-3xl font-bold text-gray-900 mt-2 md:mt-3">{value ?? "—"}</p>
+    <p className="text-xs md:text-sm font-medium text-gray-700 mt-0.5 leading-snug">{label}</p>
+    {sub && <p className="text-[10px] md:text-xs text-gray-400 mt-1">{sub}</p>}
   </div>
 );
 
 // ─── Section Wrapper ──────────────────────────────────────────────────────────
 const Section = ({ title, children }) => (
   <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-    <div className="px-6 py-4 border-b border-gray-100">
+    <div className="px-4 md:px-6 py-4 border-b border-gray-100">
       <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">{title}</h2>
     </div>
-    <div className="p-6">{children}</div>
+    <div className="p-4 md:p-6">{children}</div>
   </div>
 );
 
 // ─── User Row ─────────────────────────────────────────────────────────────────
 const UserRow = ({ u, onRoleChange, onDelete, badgeColor }) => (
-  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+    {/* User Info */}
     <div className="flex items-center gap-3">
       <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-semibold text-blue-600 flex-shrink-0">
         {u.full_name?.charAt(0)}
       </div>
-      <div>
-        <div className="flex items-center gap-2">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm font-medium text-gray-800">{u.full_name}</p>
           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badgeColor}`}>{u.role}</span>
         </div>
-        <p className="text-xs text-gray-400">{u.email} · {u.designation || "—"}</p>
+        <p className="text-xs text-gray-400 truncate">{u.email} · {u.designation || "—"}</p>
       </div>
     </div>
-    <div className="flex items-center gap-2">
+
+    {/* Actions */}
+    <div className="flex items-center gap-2 self-end sm:self-auto">
       <select
         value={u.role}
         onChange={(e) => onRoleChange(u.firebase_uid, e.target.value, u.full_name)}
-        className="text-xs px-2 py-1 rounded-lg border border-gray-200 bg-white focus:outline-none"
+        className="text-xs px-2 py-1.5 rounded-lg border border-gray-200 bg-white focus:outline-none"
       >
         <option value="employee">Employee</option>
         <option value="admin">Admin</option>
       </select>
       <button
         onClick={() => onDelete(u.firebase_uid, u.full_name)}
-        className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg transition"
+        className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg transition"
       >
         Remove
       </button>
@@ -433,7 +398,7 @@ export default function AdminDashboard() {
 
   const handleDeleteUser = (uid, name) => {
     setModal({
-      message: `""Do you want to permanently remove \"${name}\"?"`,
+      message: `Do you want to permanently remove "${name}"?`,
       onConfirm: async () => {
         setModal(null);
         try {
@@ -446,8 +411,8 @@ export default function AdminDashboard() {
 
   const handleRoleChange = (uid, newRole, name) => {
     const msg = newRole === "admin"
-      ? `"Do you want to make \"${name}\" an Admin? They will get full admin access."`
-      : `"Do you want to change \"${name}\" from Admin to Employee?"`;
+      ? `Do you want to make "${name}" an Admin? They will get full admin access.`
+      : `Do you want to change "${name}" from Admin to Employee?`;
     setModal({
       message: msg,
       onConfirm: async () => {
@@ -471,7 +436,7 @@ export default function AdminDashboard() {
       ).sort((a, b) => b.interest_count - a.interest_count)
     : [];
 
-  // ── Service counts — deduplicate by title, merge total_knows ──
+  // ── Service counts — deduplicate by title ──
   const allServiceCounts = stats?.service_expert_counts
     ? Object.values(
         stats.service_expert_counts.reduce((acc, s) => {
@@ -494,30 +459,30 @@ export default function AdminDashboard() {
   );
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto pb-24 md:pb-6">
 
       {modal && (
         <ConfirmModal message={modal.message} onConfirm={modal.onConfirm} onCancel={() => setModal(null)} />
       )}
 
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6 md:mb-8">
         <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">🔑 Admin Panel</span>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2">Admin Dashboard</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900 mt-2">Admin Dashboard</h1>
         <p className="text-sm text-gray-500 mt-0.5">Manage your CA firm workspace</p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">
         <StatCard label="Total Employees"   value={stats?.total_employees}     icon="👥" color="bg-blue-50 border-blue-100" />
         <StatCard label="Total Services"    value={stats?.total_services}       icon="📋" color="bg-green-50 border-green-100" />
         <StatCard label="Learning Requests" value={stats?.total_learning_marks} icon="📚" color="bg-purple-50 border-purple-100" sub="Want to Learn marked" />
         <StatCard label="Resources"         value={stats?.total_resources}      icon="🎥" color="bg-orange-50 border-orange-100" />
       </div>
 
+      {/* Service Coverage + Most Wanted */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
-        {/* ── Service Coverage ── */}
         <Section title={`📊 Service Coverage (${allServiceCounts.length})`}>
           {allServiceCounts.length === 0 ? (
             <p className="text-sm text-gray-400">No services found.</p>
@@ -530,8 +495,8 @@ export default function AdminDashboard() {
                     key={i}
                     className="flex items-center justify-between p-3 rounded-xl border bg-gray-50 border-gray-100"
                   >
-                    <p className="text-sm font-medium text-gray-800">{s.title}</p>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    <p className="text-sm font-medium text-gray-800 mr-2">{s.title}</p>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${
                       total > 0 ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-600"
                     }`}>
                       {total} {total === 1 ? "employee" : "employees"}
@@ -543,16 +508,15 @@ export default function AdminDashboard() {
           )}
         </Section>
 
-        {/* ── Most Wanted to Learn ── */}
         <Section title="🔥 Most Wanted to Learn">
           {!uniqueTopWanted.length ? (
             <p className="text-sm text-gray-400">No learning interests marked yet.</p>
           ) : (
             <div className="space-y-3">
               {uniqueTopWanted.map((s, i) => (
-                <div key={i} className="flex items-center justify-between">
+                <div key={i} className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium text-gray-800">{s.title}</p>
-                  <span className="text-sm font-semibold text-purple-600">{s.interest_count} interested</span>
+                  <span className="text-sm font-semibold text-purple-600 flex-shrink-0">{s.interest_count} interested</span>
                 </div>
               ))}
             </div>
@@ -602,7 +566,7 @@ export default function AdminDashboard() {
             <button
               key={action.path}
               onClick={() => navigate(action.path)}
-              className="flex flex-col items-center gap-2 p-4 bg-gray-50 hover:bg-blue-50 hover:border-blue-200 border border-gray-200 rounded-xl transition group"
+              className="flex flex-col items-center gap-2 p-3 md:p-4 bg-gray-50 hover:bg-blue-50 hover:border-blue-200 border border-gray-200 rounded-xl transition group"
             >
               <span className="text-2xl">{action.icon}</span>
               <span className="text-xs font-medium text-gray-600 group-hover:text-blue-600 text-center transition">{action.label}</span>

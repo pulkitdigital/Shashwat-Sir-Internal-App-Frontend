@@ -7,7 +7,7 @@ import {
   BookOpen,
   Library,
   ShieldCheck,
-  LogOut,
+  User,
   Zap,
 } from "lucide-react";
 
@@ -18,7 +18,7 @@ const navItems = [
   { to: "/employees",  label: "Employees",  icon: Users },
   { to: "/learning",   label: "Learning",   icon: BookOpen },
   { to: "/resources",  label: "Resources",  icon: Library },
-  { to: "/skills", label: "Skills", icon: Zap },
+  { to: "/skills",     label: "Skills",     icon: Zap },
 ];
 
 const adminItems = [
@@ -27,13 +27,8 @@ const adminItems = [
 
 // ─── Sidebar Component ─────────────────────────────────────────
 const Sidebar = () => {
-  const { user, dbUser, isAdmin, logout } = useAuth();
+  const { user, dbUser, isAdmin } = useAuth();
   const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    await logout();
-    navigate("/login");
-  };
 
   const linkClass = ({ isActive }) =>
     `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
@@ -42,7 +37,6 @@ const Sidebar = () => {
         : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
     }`;
 
-  // Mobile bottom nav link style
   const mobileLinkClass = ({ isActive }) =>
     `flex flex-col items-center gap-1 px-3 py-2 text-xs font-medium transition-colors ${
       isActive ? "text-blue-600" : "text-gray-500"
@@ -63,7 +57,6 @@ const Sidebar = () => {
 
         {/* ── Nav Links ── */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-
           {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink key={to} to={to} className={linkClass}>
               <Icon size={18} />
@@ -89,12 +82,11 @@ const Sidebar = () => {
           )}
         </nav>
 
-        {/* ── User Info + Logout (Desktop) ── */}
+        {/* ── User Info (Desktop) — logout Navbar dropdown mein hai ── */}
         <div className="px-4 py-4 border-t border-gray-100">
-          {/* ✅ Clickable avatar — profile pe navigate karo */}
           <button
             onClick={() => navigate("/profile")}
-            className="flex items-center gap-3 mb-3 w-full hover:bg-gray-50 rounded-lg p-1 transition-colors"
+            className="flex items-center gap-3 w-full hover:bg-gray-50 rounded-lg p-1 transition-colors"
             title="View Profile"
           >
             <div className="w-8 h-8 rounded-full overflow-hidden bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
@@ -121,20 +113,13 @@ const Sidebar = () => {
               </p>
             </div>
           </button>
-
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-          >
-            <LogOut size={16} />
-            Logout
-          </button>
+          {/* ✅ Logout hata diya — Navbar ke avatar dropdown mein hai */}
         </div>
       </aside>
 
       {/* ══════════════════════════════════════════
-          MOBILE BOTTOM NAV — Profile hata diya ✅
-          Navbar ke avatar se profile open hoga
+          MOBILE BOTTOM NAV — logout removed ✅
+          Navbar avatar dropdown se logout hoga
       ══════════════════════════════════════════ */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 flex items-center justify-around px-2 py-1">
 
@@ -146,21 +131,18 @@ const Sidebar = () => {
         ))}
 
         {/* Admin — mobile mein bhi dikhao agar admin hai */}
-        {isAdmin && adminItems.map(({ to, label, icon: Icon }) => (
+        {/* {isAdmin && adminItems.map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} className={mobileLinkClass}>
             <Icon size={20} />
             <span className="text-[10px]">{label}</span>
           </NavLink>
-        ))}
+        ))} */}
 
-        {/* Logout */}
-        <button
-          onClick={handleLogout}
-          className="flex flex-col items-center gap-1 px-3 py-2 text-xs font-medium text-red-500"
-        >
-          <LogOut size={20} />
-          <span className="text-[10px]">Logout</span>
-        </button>
+        {/* ── Profile tab — mobile mein avatar se profile/logout access ── */}
+        {/* <NavLink to="/profile" className={mobileLinkClass}>
+          <User size={20} />
+          <span className="text-[10px]">Profile</span>
+        </NavLink> */}
 
       </nav>
 

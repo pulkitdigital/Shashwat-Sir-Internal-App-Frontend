@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { userAPI, serviceAPI, employeeAPI } from "../../services/api";
+import { userAPI, serviceAPI, employeeAPI, learningAPI } from "../../services/api";
 
 export default function Profile() {
   const { user, dbUser, refreshUser } = useAuth();
   const fileRef = useRef();
   const dropRef = useRef();
+  const learnDropRef = useRef();
 
   const [form, setForm] = useState({
     full_name:   "",
@@ -26,8 +27,16 @@ export default function Profile() {
   const [skillError,    setSkillError]    = useState("");
 
   const [searchText,    setSearchText]    = useState("");
-  const [selectedSkill, setSelectedSkill] = useState(null); // from dropdown
+  const [selectedSkill, setSelectedSkill] = useState(null);
   const [showDrop,      setShowDrop]      = useState(false);
+
+  // ── Want to Learn state ──
+  const [myLearning,       setMyLearning]       = useState([]);
+  const [learnLoading,     setLearnLoading]     = useState(false);
+  const [learnError,       setLearnError]       = useState("");
+  const [learnSearchText,  setLearnSearchText]  = useState("");
+  const [selectedLearn,    setSelectedLearn]    = useState(null);
+  const [showLearnDrop,    setShowLearnDrop]    = useState(false);
 
   // Normalize service_id to String always
   const dedup = (list) =>
@@ -51,13 +60,25 @@ export default function Profile() {
   useEffect(() => {
     fetchSkills();
     fetchAllServices();
+    fetchLearning();
   }, []);
 
-  // Close dropdown on outside click
+  // Close skill dropdown on outside click
   useEffect(() => {
     const handler = (e) => {
       if (dropRef.current && !dropRef.current.contains(e.target)) {
         setShowDrop(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Close learn dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (learnDropRef.current && !learnDropRef.current.contains(e.target)) {
+        setShowLearnDrop(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -83,47 +104,62 @@ export default function Profile() {
     }
   };
 
-  const mySkillIds  = new Set(mySkills.map((s) => String(s.service_id)));
+  // ── Fetch learning interests ──
+  const fetchLearning = async () => {
+    try {
+      const res = await learningAPI.getMine();
+      // API returns array of { service_id, title, status, ... }
+      const interests = res.data.interests || res.data.learning || [];
+      setMyLearning(dedup(interests));
+    } catch (err) {
+      console.error("fetchLearning error:", err.message);
+    }
+  };
+
+  const mySkillIds    = new Set(mySkills.map((s) => String(s.service_id)));
   const mySkillTitles = new Set(mySkills.map((s) => s.title?.trim().toLowerCase()));
+
+  const myLearnIds    = new Set(myLearning.map((s) => String(s.service_id)));
+  const myLearnTitles = new Set(myLearning.map((s) => s.title?.trim().toLowerCase()));
 
   const availableServices = allServices.filter(
     (s) => !mySkillIds.has(String(s.id))
+  );
+
+  // For learn dropdown: exclude already-learning items
+  const learnableServices = allServices.filter(
+    (s) => !myLearnIds.has(String(s.id))
   );
 
   const filteredServices = availableServices.filter((s) =>
     s.title.toLowerCase().includes(searchText.toLowerCase())
   );
 
+  const filteredLearnServices = learnableServices.filter((s) =>
+    s.title.toLowerCase().includes(learnSearchText.toLowerCase())
+  );
+
   // ── Add skill ──
-  // Two modes:
-  // 1. selectedSkill != null  → user picked from dropdown → add by service_id
-  // 2. selectedSkill == null  → user typed custom text    → add as custom title
   const handleAddSkill = async () => {
     const trimmed = searchText.trim();
-
     if (!trimmed) {
       setSkillError("Type something or select from the dropdown.");
       return;
     }
 
-    // ── Mode 1: dropdown selection ──
     if (selectedSkill) {
       if (mySkillIds.has(String(selectedSkill.id))) {
         setSkillError("This service is already added.");
         return;
       }
-
       setSkillError("");
       setSearchText("");
       setShowDrop(false);
       setSelectedSkill(null);
       setSkillLoading(true);
-
-      // Optimistic
       setMySkills((prev) =>
         dedup([...prev, { service_id: String(selectedSkill.id), title: selectedSkill.title }])
       );
-
       try {
         await employeeAPI.addSkill({ service_id: selectedSkill.id });
         const res = await userAPI.getProfile();
@@ -140,34 +176,22 @@ export default function Profile() {
       return;
     }
 
-    // ── Mode 2: custom free-text skill ──
-    // Check duplicate by title (case-insensitive)
     if (mySkillTitles.has(trimmed.toLowerCase())) {
       setSkillError("This skill is already added.");
       return;
     }
-
     setSkillError("");
     setSearchText("");
     setShowDrop(false);
     setSkillLoading(true);
-
-    // Use a unique temp key for optimistic entry
     const tempId = `custom_${Date.now()}`;
-
-    // Optimistic add
-    setMySkills((prev) =>
-      dedup([...prev, { service_id: tempId, title: trimmed }])
-    );
-
+    setMySkills((prev) => dedup([...prev, { service_id: tempId, title: trimmed }]));
     try {
       await employeeAPI.addCustomSkill({ title: trimmed });
-      // Re-fetch to get real service_id from server
       const res = await userAPI.getProfile();
       setMySkills(dedup(res.data.profile?.known_services || []));
     } catch (err) {
       console.error("addCustomSkill error:", err.message);
-      // Rollback optimistic entry
       setMySkills((prev) => prev.filter((s) => s.service_id !== tempId));
       setSkillError("Failed to add skill. Please try again.");
     } finally {
@@ -177,12 +201,8 @@ export default function Profile() {
 
   // ── Remove skill ──
   const handleRemoveSkill = async (serviceId) => {
-    const removed = mySkills.find(
-      (s) => String(s.service_id) === String(serviceId)
-    );
-    setMySkills((prev) =>
-      prev.filter((s) => String(s.service_id) !== String(serviceId))
-    );
+    const removed = mySkills.find((s) => String(s.service_id) === String(serviceId));
+    setMySkills((prev) => prev.filter((s) => String(s.service_id) !== String(serviceId)));
     try {
       await employeeAPI.removeSkill(serviceId);
     } catch (err) {
@@ -191,9 +211,91 @@ export default function Profile() {
     }
   };
 
-  // Enter key support
+  // ── Add learning interest ──
+  const handleAddLearning = async () => {
+    const trimmed = learnSearchText.trim();
+    if (!trimmed) {
+      setLearnError("Type something or select from the dropdown.");
+      return;
+    }
+
+    // Mode 1: from dropdown
+    if (selectedLearn) {
+      if (myLearnIds.has(String(selectedLearn.id))) {
+        setLearnError("Already in your Want to Learn list.");
+        return;
+      }
+      setLearnError("");
+      setLearnSearchText("");
+      setShowLearnDrop(false);
+      setSelectedLearn(null);
+      setLearnLoading(true);
+
+      // Optimistic
+      setMyLearning((prev) =>
+        dedup([...prev, { service_id: String(selectedLearn.id), title: selectedLearn.title }])
+      );
+      try {
+        await learningAPI.add({ service_id: selectedLearn.id });
+        await fetchLearning();
+      } catch (err) {
+        console.error("addLearning error:", err.message);
+        setMyLearning((prev) =>
+          prev.filter((s) => String(s.service_id) !== String(selectedLearn.id))
+        );
+        setLearnError("Failed to add. Please try again.");
+      } finally {
+        setLearnLoading(false);
+      }
+      return;
+    }
+
+    // Mode 2: free text — custom learning interest (same as skills)
+    if (myLearnTitles.has(trimmed.toLowerCase())) {
+      setLearnError("Already in your Want to Learn list.");
+      return;
+    }
+
+    setLearnError("");
+    setLearnSearchText("");
+    setShowLearnDrop(false);
+    setLearnLoading(true);
+
+    const tempId = `custom_learn_${Date.now()}`;
+    setMyLearning((prev) =>
+      dedup([...prev, { service_id: tempId, title: trimmed }])
+    );
+    try {
+      await learningAPI.addCustom({ title: trimmed });
+      await fetchLearning();
+    } catch (err) {
+      console.error("addLearning custom error:", err.message);
+      setMyLearning((prev) => prev.filter((s) => s.service_id !== tempId));
+      setLearnError("Failed to add. Please try again.");
+    } finally {
+      setLearnLoading(false);
+    }
+  };
+
+  // ── Remove learning interest ──
+  const handleRemoveLearning = async (serviceId) => {
+    const removed = myLearning.find((s) => String(s.service_id) === String(serviceId));
+    setMyLearning((prev) => prev.filter((s) => String(s.service_id) !== String(serviceId)));
+    try {
+      await learningAPI.remove(serviceId);
+    } catch (err) {
+      console.error("removeLearning error:", err.message);
+      if (removed) setMyLearning((prev) => dedup([...prev, removed]));
+    }
+  };
+
+
   const handleKeyDown = (e) => {
     if (e.key === "Enter") handleAddSkill();
+  };
+
+  const handleLearnKeyDown = (e) => {
+    if (e.key === "Enter") handleAddLearning();
   };
 
   const handleChange = (e) =>
@@ -248,8 +350,8 @@ export default function Profile() {
     }
   };
 
-  // Add button enabled if there's any text (dropdown selected OR free text typed)
-  const canAdd = searchText.trim().length > 0 && !skillLoading;
+  const canAdd      = searchText.trim().length > 0 && !skillLoading;
+  const canAddLearn = learnSearchText.trim().length > 0 && !learnLoading;
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -352,7 +454,7 @@ export default function Profile() {
               value={searchText}
               onChange={(e) => {
                 setSearchText(e.target.value);
-                setSelectedSkill(null); // clear dropdown selection when typing
+                setSelectedSkill(null);
                 setShowDrop(true);
                 setSkillError("");
               }}
@@ -361,7 +463,6 @@ export default function Profile() {
               placeholder="Search services or type a custom skill..."
               className="flex-1 px-3 py-2.5 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
             />
-            {/* Enabled as long as there is any text — dropdown pick OR free text */}
             <button
               onClick={handleAddSkill}
               disabled={!canAdd}
@@ -371,7 +472,6 @@ export default function Profile() {
             </button>
           </div>
 
-          {/* Dropdown — existing services not yet added */}
           {showDrop && filteredServices.length > 0 && (
             <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
               {filteredServices.map((s) => (
@@ -395,29 +495,21 @@ export default function Profile() {
             </div>
           )}
 
-          {/* Show hint when no dropdown match — custom skill will be added */}
           {showDrop && searchText.trim() && filteredServices.length === 0 && (
             <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3">
               <p className="text-sm text-gray-500">
                 No match found —{" "}
-                <span className="font-medium text-blue-600">
-                  "{searchText.trim()}"
-                </span>{" "}
+                <span className="font-medium text-blue-600">"{searchText.trim()}"</span>{" "}
                 will be added as a custom skill.
               </p>
             </div>
           )}
         </div>
 
-        {skillError && (
-          <p className="text-xs text-red-500 mb-3">{skillError}</p>
-        )}
+        {skillError && <p className="text-xs text-red-500 mb-3">{skillError}</p>}
 
-        {/* Skills list */}
         {mySkills.length === 0 ? (
-          <p className="text-sm text-gray-400">
-            No skills added yet. Search and add from above.
-          </p>
+          <p className="text-sm text-gray-400">No skills added yet. Search and add from above.</p>
         ) : (
           <div className="space-y-2 mt-3">
             {mySkills.map((skill) => (
@@ -428,6 +520,105 @@ export default function Profile() {
                 <span className="text-sm font-medium text-gray-800">{skill.title}</span>
                 <button
                   onClick={() => handleRemoveSkill(skill.service_id)}
+                  className="text-gray-300 hover:text-red-500 transition text-lg leading-none"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Want to Learn ── */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-4">
+        <div className="flex items-center gap-2 mb-1">
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+            Want to Learn
+          </h2>
+          <span className="text-base">📚</span>
+        </div>
+        <p className="text-xs text-gray-400 mb-4">
+          Services you're interested in learning. You can track progress as you go.
+        </p>
+
+        <div className="relative mb-3" ref={learnDropRef}>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={learnSearchText}
+              onChange={(e) => {
+                setLearnSearchText(e.target.value);
+                setSelectedLearn(null);
+                setShowLearnDrop(true);
+                setLearnError("");
+              }}
+              onFocus={() => setShowLearnDrop(true)}
+              onKeyDown={handleLearnKeyDown}
+              placeholder="Search a service to learn..."
+              className="flex-1 px-3 py-2.5 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+            />
+            <button
+              onClick={handleAddLearning}
+              disabled={!canAddLearn}
+              className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition whitespace-nowrap"
+            >
+              {learnLoading ? "Adding..." : "Add"}
+            </button>
+          </div>
+
+          {/* Learn dropdown */}
+          {showLearnDrop && filteredLearnServices.length > 0 && (
+            <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+              {filteredLearnServices.map((s) => (
+                <button
+                  key={s.id}
+                  onMouseDown={() => {
+                    setSelectedLearn(s);
+                    setLearnSearchText(s.title);
+                    setShowLearnDrop(false);
+                    setLearnError("");
+                  }}
+                  className={`w-full text-left px-4 py-2.5 text-sm transition first:rounded-t-xl last:rounded-b-xl ${
+                    selectedLearn?.id === s.id
+                      ? "bg-purple-50 text-purple-700 font-medium"
+                      : "text-gray-800 hover:bg-purple-50 hover:text-purple-700"
+                  }`}
+                >
+                  {s.title}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* No match hint */}
+          {showLearnDrop && learnSearchText.trim() && filteredLearnServices.length === 0 && (
+            <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3">
+              <p className="text-sm text-gray-500">
+                No match found —{" "}
+                <span className="font-medium text-purple-600">"{learnSearchText.trim()}"</span>{" "}
+                will be added as a custom interest.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {learnError && <p className="text-xs text-red-500 mb-3">{learnError}</p>}
+
+        {myLearning.length === 0 ? (
+          <p className="text-sm text-gray-400">
+            No learning interests added yet. Search and add a service from above.
+          </p>
+        ) : (
+          <div className="space-y-2 mt-3">
+            {myLearning.map((item) => (
+              <div
+                key={item.service_id}
+                className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50"
+              >
+                <span className="text-sm font-medium text-gray-800">{item.title}</span>
+                <button
+                  onClick={() => handleRemoveLearning(item.service_id)}
                   className="text-gray-300 hover:text-red-500 transition text-lg leading-none"
                 >
                   ×

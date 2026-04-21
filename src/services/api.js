@@ -103,9 +103,11 @@ export const learningAPI = {
   getMine       : ()                  => api.get("/learning"),
   getAll        : ()                  => api.get("/learning/all"),                // 🔑 Admin only
   add           : (data)              => api.post("/learning", data),              // { service_id, status }
+  addCustom    : (data)              => api.post("/learning/custom", data),  // ← YE ADD KARO
   updateStatus  : (serviceId, data)   => api.put(`/learning/${serviceId}`, data), // { status: "in_progress" | "completed" }
   remove        : (serviceId)         => api.delete(`/learning/${serviceId}`),
 };
+
 
 // ─── Resources ────────────────────────────────────────────────────────────────
 export const resourceAPI = {
